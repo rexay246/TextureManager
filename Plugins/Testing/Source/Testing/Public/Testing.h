@@ -14,4 +14,5 @@ public:
 	virtual void StartupModule() override;
 	void OnAssetImported(UFactory* Factory, UObject* Imported);
 	virtual void ShutdownModule() override;
+	TSharedRef<SDockTab> OnSpawnPluginTab(const FSpawnTabArgs& Args);
 };

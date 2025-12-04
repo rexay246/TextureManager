@@ -6,27 +6,38 @@
 
 void FTestingModule::StartupModule()
 {
-    UE_LOG(LogTemp, Warning, TEXT("Testing module loaded"));
-
-    if (!GEditor)
+    // Load the Importing
     {
-        UE_LOG(LogTemp, Error, TEXT("GEditor IS NULL!"));
-        return;
+        UE_LOG(LogTemp, Warning, TEXT("Testing module loaded"));
+
+        if (!GEditor)
+        {
+            UE_LOG(LogTemp, Error, TEXT("GEditor IS NULL!"));
+            return;
+        }
+
+        UImportSubsystem* ImportSubsystem = GEditor->GetEditorSubsystem<UImportSubsystem>();
+
+        if (!ImportSubsystem)
+        {
+            UE_LOG(LogTemp, Error, TEXT("ImportSubsystem is NULL!"));
+            return;
+        }
+
+        ImportSubsystem->OnAssetPostImport.AddRaw(
+            this, &FTestingModule::OnAssetImported
+        );
+
+        UE_LOG(LogTemp, Warning, TEXT("Delegate bound successfully"));
     }
 
-    UImportSubsystem* ImportSubsystem = GEditor->GetEditorSubsystem<UImportSubsystem>();
-
-    if (!ImportSubsystem)
-    {
-        UE_LOG(LogTemp, Error, TEXT("ImportSubsystem is NULL!"));
-        return;
-    }
-
-    ImportSubsystem->OnAssetPostImport.AddRaw(
-        this, &FTestingModule::OnAssetImported
-    );
-
-    UE_LOG(LogTemp, Warning, TEXT("Delegate bound successfully"));
+    // Editor Tab
+    FGlobalTabmanager::Get()->RegisterNomadTabSpawner(
+        "MyPluginWindow",
+        FOnSpawnTab::CreateRaw(this, &FTestingModule::OnSpawnPluginTab)
+    )
+        .SetDisplayName(FText::FromString("My Plugin"))
+        .SetMenuType(ETabSpawnerMenuType::Hidden);
 }
 
 void FTestingModule::OnAssetImported(UFactory* Factory, UObject* Imported)
@@ -38,6 +49,14 @@ void FTestingModule::OnAssetImported(UFactory* Factory, UObject* Imported)
     {
         UE_LOG(LogTemp, Warning, TEXT("     --> This is a texture"));
     }
+}
+
+TSharedRef<SDockTab> FTestingModule::OnSpawnPluginTab(const FSpawnTabArgs& Args)
+{
+    return SNew(SDockTab)
+        [
+            SNew(STextBlock).Text(FText::FromString("Hello from my plugin!"))
+        ];
 }
 
 void FTestingModule::ShutdownModule()
