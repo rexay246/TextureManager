@@ -5,6 +5,7 @@
 #include "Modules/ModuleManager.h"
 #include "Subsystems/ImportSubsystem.h"
 #include "Editor.h"
+#include <SMyTwoColumnWidget.h>
 
 class FTestingModule : public IModuleInterface
 {
@@ -15,4 +16,10 @@ public:
 	void OnAssetImported(UFactory* Factory, UObject* Imported);
 	virtual void ShutdownModule() override;
 	TSharedRef<SDockTab> OnSpawnPluginTab(const FSpawnTabArgs& Args);
+
+	UPROPERTY()
+	UObject* SomeObjectToEdit = nullptr;
+
+private:
+	TSharedPtr< SMyTwoColumnWidget > ManagerWidget;
 };

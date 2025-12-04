@@ -1,5 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
+using System.IO;
 using UnrealBuildTool;
 
 public class Testing : ModuleRules
@@ -10,6 +11,7 @@ public class Testing : ModuleRules
 		
 		PublicIncludePaths.AddRange(
 			new string[] {
+                Path.Combine(ModuleDirectory, "Public")
 				// ... add public include paths required here ...
 			}
 			);
@@ -17,6 +19,7 @@ public class Testing : ModuleRules
 		
 		PrivateIncludePaths.AddRange(
 			new string[] {
+                Path.Combine(ModuleDirectory, "Private")
 				// ... add other private include paths required here ...
 			}
 			);
@@ -29,7 +32,10 @@ public class Testing : ModuleRules
 				"CoreUObject",
 				"Engine",
 				// ... add other public dependencies that you statically link with here ...
-			}
+				"InputCore",
+				"PropertyEditor",   // <-- REQUIRED for IDetailsView
+				"ApplicationCore"
+            }
 			);
 			
 		
