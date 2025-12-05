@@ -25,6 +25,10 @@
 #if WITH_EDITOR
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Modules/ModuleManager.h"
+#include "Misc/MessageDialog.h"   // ? for confirmation dialog
+
+#include "AssetRegistry/AssetRegistryModule.h"
+#include "Modules/ModuleManager.h"
 #endif
 
 class IDetailsView;
@@ -58,26 +62,69 @@ public:
         ChildSlot
             [
                 SNew(SSplitter)
-
-                    // Left column: navigation
-                    + SSplitter::Slot()
-                    .Value(0.30f)
-                    [
-                        BuildLeftColumn()
-                    ]
-
-                    // Right column: header + details view
-                    + SSplitter::Slot()
-                    .Value(0.70f)
-                    [
-                        BuildRightColumn()
-                    ]
+                    + SSplitter::Slot().Value(0.30f)[BuildLeftColumn()]
+                    + SSplitter::Slot().Value(0.70f)[BuildRightColumn()]
             ];
+
+#if WITH_EDITOR
+        // Optional: gather existing textures under /Game
+        FAssetRegistryModule& AssetRegistryModule =
+            FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+
+        FARFilter Filter;
+        Filter.ClassPaths.Add(UTexture2D::StaticClass()->GetClassPathName());
+        Filter.bRecursiveClasses = true;
+        Filter.PackagePaths.Add(FName(TEXT("/Game")));
+        Filter.bRecursivePaths = true;
+
+        TArray<FAssetData> TextureAssets;
+        AssetRegistryModule.Get().GetAssets(Filter, TextureAssets);
+
+        for (const FAssetData& AssetData : TextureAssets)
+        {
+            if (UTexture2D* Tex = Cast<UTexture2D>(AssetData.GetAsset()))
+            {
+                TextureItems.Add(Tex);
+            }
+        }
+
+        if (TextureListView.IsValid())
+        {
+            TextureListView->RequestListRefresh();
+        }
+#endif
 
         RefreshPresetOptions();
     }
 
-    // Called by module when a texture is imported / selected
+
+    // Called by module when a texture is imported / discovered
+    void AddImportedTexture(UTexture2D* InTexture)
+    {
+        if (!InTexture)
+        {
+            return;
+        }
+
+        FTextureItem NewItem = InTexture;
+
+        // Avoid duplicates
+        if (!TextureItems.Contains(NewItem))
+        {
+            TextureItems.Add(NewItem);
+        }
+
+        // Refresh the list view
+        if (TextureListView.IsValid())
+        {
+            TextureListView->RequestListRefresh();
+
+            // Optional: auto-select the newly added texture
+            TextureListView->SetSelection(NewItem);
+        }
+    }
+
+    // Existing
     void SetSelectedTexture(UTexture2D* InTexture)
     {
         SelectedTexture = InTexture;
@@ -95,6 +142,7 @@ public:
         // 2) Sync selection with the texture's assigned preset (if any)
         RefreshPresetOptionsFromSelection();
     }
+
 
 private:
 
@@ -184,7 +232,7 @@ private:
             .ListItemsSource(&TextureItems)
             .OnGenerateRow(this, &SMyTwoColumnWidget::GenerateTextureRow)
             .OnSelectionChanged(this, &SMyTwoColumnWidget::OnTextureSelected)
-            .SelectionMode(ESelectionMode::Single);
+            .SelectionMode(ESelectionMode::Multi);
 
         return TextureListView.ToSharedRef();
     }
@@ -482,22 +530,104 @@ private:
     void OnPresetComboChanged(TSharedPtr<FString> NewSelection, ESelectInfo::Type)
     {
         CurrentPresetOption = NewSelection;
-        // Later: look up the corresponding preset asset and set SelectedPreset
+
+#if WITH_EDITOR
+        if (!NewSelection.IsValid())
+            return;
+
+        UTexturePresetAsset* FoundPreset =
+            TexturePresetLibrary::FindPresetByName(*NewSelection);
+
+        if (FoundPreset)
+        {
+            SelectedPreset = FoundPreset;
+
+            // Optional: if the Presets tab is active, show the preset asset in the details panel
+            if (DetailsView.IsValid() && ActiveTab == ENavigationTab::Presets)
+            {
+                DetailsView->SetObject(FoundPreset);
+            }
+        }
+#endif
     }
+
 
     bool CanApplyPreset() const
     {
-        return SelectedTexture.IsValid() && SelectedPreset.IsValid();
+        // As long as we have a preset chosen, we can *try* to apply –
+        // we'll validate textures inside OnApplyPresetClicked.
+        return SelectedPreset.IsValid();
     }
 
     FReply OnApplyPresetClicked()
     {
-        if (CanApplyPreset())
+#if WITH_EDITOR
+        if (!SelectedPreset.IsValid())
         {
-            TexturePresetLibrary::ApplyToTexture(SelectedPreset.Get(), SelectedTexture.Get());
+            return FReply::Handled();
         }
+
+        // Collect selected textures from the list view
+        TArray<FTextureItem> SelectedItems;
+
+        if (TextureListView.IsValid())
+        {
+            TextureListView->GetSelectedItems(SelectedItems);
+        }
+
+        // Fallback: if nothing is explicitly selected in the list but we
+        // still have SelectedTexture (e.g., set programmatically), use that.
+        if (SelectedItems.Num() == 0 && SelectedTexture.IsValid())
+        {
+            SelectedItems.Add(SelectedTexture);
+        }
+
+        if (SelectedItems.Num() == 0)
+        {
+            // Nothing to apply to
+            return FReply::Handled();
+        }
+
+        // If multiple, confirm with the user
+        if (SelectedItems.Num() > 1)
+        {
+            UTexturePresetAsset* Preset = SelectedPreset.Get();
+            const FString PresetLabel = Preset
+                ? (!Preset->PresetName.IsNone()
+                    ? Preset->PresetName.ToString()
+                    : Preset->GetName())
+                : TEXT("<Preset>");
+
+            const FString Msg = FString::Printf(
+                TEXT("Apply preset \"%s\" to %d textures?"),
+                *PresetLabel,
+                SelectedItems.Num());
+
+            const EAppReturnType::Type Result = FMessageDialog::Open(
+                EAppMsgType::YesNo,
+                FText::FromString(Msg));
+
+            if (Result != EAppReturnType::Yes)
+            {
+                return FReply::Handled();
+            }
+        }
+
+        // Apply preset to all selected textures
+        for (const FTextureItem& Item : SelectedItems)
+        {
+            if (Item.IsValid())
+            {
+                UTexture2D* Texture = Item.Get();
+                TexturePresetLibrary::AssignPresetToTexture(SelectedPreset.Get(), Texture);
+                TexturePresetLibrary::ApplyToTexture(SelectedPreset.Get(), Texture);
+            }
+        }
+#endif
+
         return FReply::Handled();
     }
+
 
     bool CanSaveAsPreset() const
     {

@@ -16,33 +16,91 @@ namespace TexturePresetLibrary
 	{
 		if (!PresetAsset || !Texture) return;
 
-		auto& Out = PresetAsset->Settings;
+		FTexturePresetSettings& Out = PresetAsset->Settings;
 
+		// --- Core ---
 		Out.LODGroup = Texture->LODGroup;
+		Out.LODBias = Texture->LODBias;
 		Out.CompressionSettings = Texture->CompressionSettings;
+		//Out.CompressionQuality = Texture->CompressionQuality;
 		Out.bSRGB = Texture->SRGB;
-		Out.bUseAlpha = Texture->HasAlphaChannel();
-		Out.bFlipGreenChannel = Texture->bFlipGreenChannel; // if exposed
 
-		// Add more fields from FTexturePresetSettings as needed.
+		Out.bUseAlpha = Texture->HasAlphaChannel(); // informational
+		Out.bFlipGreenChannel = Texture->bFlipGreenChannel;
+
+		// --- Filter / addressing ---
+		Out.Filter = Texture->Filter;
+		Out.AddressX = Texture->AddressX;
+		Out.AddressY = Texture->AddressY;
+		//Out.AddressZ = Texture->AddressZ;
+		//Out.MaxAnisotropy = Texture->MaxAnisotropy;
+
+		// --- Mips / size ---
+		Out.MipGenSettings = Texture->MipGenSettings;
+		Out.MaxTextureSize = Texture->MaxTextureSize;
+		Out.NumCinematicMipLevels = Texture->NumCinematicMipLevels;
+		Out.bPreserveBorder = Texture->bPreserveBorder;
+		//Out.DownscaleFactor = Texture->DownscaleFactor;
+		//Out.DownscaleOptions = Texture->DownscaleOptions;
+
+		// --- Streaming / residency ---
+		Out.NeverStream = Texture->NeverStream;
+		Out.bForceMiplevelsToBeResident = Texture->bForceMiplevelsToBeResident;
+		//Out.StreamingDistanceMultiplier = Texture->StreamingDistanceMultiplier;
+
+		// --- Virtual texturing ---
+		Out.VirtualTextureStreaming = Texture->VirtualTextureStreaming;
+
+		// Add more fields here if you decide to extend the struct later.
 	}
+
 
 	void ApplyToTexture(UTexturePresetAsset* PresetAsset, UTexture2D* Texture)
 	{
 		if (!PresetAsset || !Texture) return;
 
-		const auto& In = PresetAsset->Settings;
+		const FTexturePresetSettings& In = PresetAsset->Settings;
 
 		Texture->Modify();
 
+		// --- Core ---
 		Texture->LODGroup = In.LODGroup;
+		Texture->LODBias = In.LODBias;
 		Texture->CompressionSettings = In.CompressionSettings;
+		//Texture->CompressionQuality = In.CompressionQuality;
 		Texture->SRGB = In.bSRGB;
 		Texture->bFlipGreenChannel = In.bFlipGreenChannel;
+
+		// NOTE: bUseAlpha is informational; you can’t actually force a texture
+		// to “have alpha” without changing its source/import. We don’t apply it.
+
+		// --- Filter / addressing ---
+		Texture->Filter = In.Filter;
+		Texture->AddressX = In.AddressX;
+		Texture->AddressY = In.AddressY;
+		//Texture->AddressZ = In.AddressZ;
+		//Texture->MaxAnisotropy = In.MaxAnisotropy;
+
+		// --- Mips / size ---
+		Texture->MipGenSettings = In.MipGenSettings;
+		Texture->MaxTextureSize = In.MaxTextureSize;
+		Texture->NumCinematicMipLevels = In.NumCinematicMipLevels;
+		Texture->bPreserveBorder = In.bPreserveBorder;
+		//Texture->DownscaleFactor = In.DownscaleFactor;
+		//Texture->DownscaleOptions = In.DownscaleOptions;
+
+		// --- Streaming / residency ---
+		Texture->NeverStream = In.NeverStream;
+		Texture->bForceMiplevelsToBeResident = In.bForceMiplevelsToBeResident;
+		//Texture->StreamingDistanceMultiplier = In.StreamingDistanceMultiplier;
+
+		// --- Virtual texturing ---
+		Texture->VirtualTextureStreaming = In.VirtualTextureStreaming;
 
 		Texture->PostEditChange();
 		Texture->MarkPackageDirty();
 	}
+
 
 	UTexturePresetAsset* CreatePresetAssetFromTexture(
 		UTexture2D* Texture,
@@ -133,4 +191,56 @@ namespace TexturePresetLibrary
 		Texture->PostEditChange();
 #endif
 	}
+
+	UTexturePresetAsset* FindPresetByName( const FString& InPresetName, const FString& SearchRootPath /*= TEXT("/Game")*/)
+	{
+#if WITH_EDITOR
+		if (InPresetName.IsEmpty())
+		{
+			return nullptr;
+		}
+
+		// Load Asset Registry
+		FAssetRegistryModule& AssetRegistryModule =
+			FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+
+		// Build a filter for all UTexturePresetAsset under SearchRootPath
+		FARFilter Filter;
+		Filter.ClassPaths.Add(UTexturePresetAsset::StaticClass()->GetClassPathName());
+		Filter.bRecursiveClasses = true;
+
+		const FName RootPathName(*SearchRootPath);
+		Filter.PackagePaths.Add(RootPathName);
+		Filter.bRecursivePaths = true;
+
+		TArray<FAssetData> PresetAssets;
+		AssetRegistryModule.Get().GetAssets(Filter, PresetAssets);
+
+		const FName TargetName(*InPresetName);
+
+		for (const FAssetData& AssetData : PresetAssets)
+		{
+			UTexturePresetAsset* Preset = Cast<UTexturePresetAsset>(AssetData.GetAsset());
+			if (!Preset)
+			{
+				continue;
+			}
+
+			// Match either the PresetName property or the asset object name
+			const bool bMatchByPresetName =
+				!Preset->PresetName.IsNone() && (Preset->PresetName == TargetName);
+
+			const bool bMatchByObjectName =
+				Preset->GetFName() == TargetName;
+
+			if (bMatchByPresetName || bMatchByObjectName)
+			{
+				return Preset;
+			}
+		}
+#endif
+
+		return nullptr;
+	}
+
 }

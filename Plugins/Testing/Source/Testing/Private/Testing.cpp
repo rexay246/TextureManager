@@ -73,6 +73,11 @@ void FTestingModule::OnAssetImported(UFactory* Factory, UObject* Imported)
         if (ManagerWidget.IsValid())
         {
             ManagerWidget->SetSelectedTexture(Cast<UTexture2D>(Imported));
+            // 1) Add it to the Files list (this refreshes the view)
+            ManagerWidget->AddImportedTexture(Cast<UTexture2D>(Imported));
+
+            // 2) Also make it the active selection / show it in details panel
+            ManagerWidget->SetSelectedTexture(Cast<UTexture2D>(Imported));
         }
     }
 }
