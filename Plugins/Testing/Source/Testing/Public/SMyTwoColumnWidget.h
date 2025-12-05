@@ -281,7 +281,7 @@ private:
     TSharedRef<SWidget> BuildHeaderBar()
     {
         return
-            SNew(SHorizontalBox)
+            SNew(SHorizontalBox)      
 
             // Label
             + SHorizontalBox::Slot()
@@ -291,6 +291,8 @@ private:
             [
                 SNew(STextBlock)
                     .Text(FText::FromString(TEXT("Current Preset:")))
+                    .IsEnabled(this, &SMyTwoColumnWidget::CanApplyPreset)
+                    .Visibility(this, &SMyTwoColumnWidget::IsFilesChosen)
             ]
 
             // Preset dropdown
@@ -301,6 +303,7 @@ private:
                     .OptionsSource(&PresetOptions)
                     .InitiallySelectedItem(CurrentPresetOption)
                     .OnSelectionChanged(this, &SMyTwoColumnWidget::OnPresetComboChanged)
+                    .Visibility(this, &SMyTwoColumnWidget::IsFilesChosen)
             ]
 
             // Apply button
@@ -310,8 +313,7 @@ private:
             [
                 SNew(SButton)
                     .Text(FText::FromString(TEXT("Apply")))
-                    .OnClicked(this, &SMyTwoColumnWidget::OnApplyPresetClicked)
-                    .IsEnabled(this, &SMyTwoColumnWidget::CanApplyPreset)
+                    .OnClicked(this, &SMyTwoColumnWidget::OnApplyPresetClicked)           
             ]
 
             // Save button
@@ -323,6 +325,7 @@ private:
                     .Text(FText::FromString(TEXT("Save As Preset")))
                     .OnClicked(this, &SMyTwoColumnWidget::OnSaveAsPresetClicked)
                     .IsEnabled(this, &SMyTwoColumnWidget::CanSaveAsPreset)
+                    .Visibility(this, &SMyTwoColumnWidget::IsFilesChosen)
             ]
 
             // Spacer
@@ -333,6 +336,11 @@ private:
     // ---------- Helpers / callbacks ----------
 
     ENavigationTab GetActiveTab() const { return ActiveTab; }
+
+    EVisibility IsFilesChosen() const
+    {
+        return ActiveTab == ENavigationTab::Files ? EVisibility::Visible : EVisibility::Collapsed;
+    }
 
     int32 GetWidgetIndex() const
     {
@@ -370,17 +378,18 @@ private:
             ];
     }
 
-    void OnTextureSelected(FTextureItem Item, ESelectInfo::Type)
+    void OnTextureSelected(FTextureItem Item, ESelectInfo::Type check)
     {
         SelectedTexture = Item;
         ActiveTab = ENavigationTab::Files;
+
+        RefreshPresetOptions();
+        RefreshPresetOptionsFromSelection();
 
         if (DetailsView.IsValid())
         {
             DetailsView->SetObject(SelectedTexture.Get());
         }
-
-        RefreshPresetOptionsFromSelection();
     }
 
     TSharedRef<ITableRow> GeneratePresetRow(
@@ -417,7 +426,7 @@ private:
         SelectedPreset = Item;
         ActiveTab = ENavigationTab::Presets;
 
-        if (DetailsView.IsValid() && SelectedPreset.IsValid())
+        if (DetailsView.IsValid())
         {
             DetailsView->SetObject(SelectedPreset.Get());
         }
@@ -543,9 +552,76 @@ private:
             SelectedPreset = FoundPreset;
 
             // Optional: if the Presets tab is active, show the preset asset in the details panel
-            if (DetailsView.IsValid() && ActiveTab == ENavigationTab::Presets)
+            if (DetailsView.IsValid())
             {
-                DetailsView->SetObject(FoundPreset);
+                if (ActiveTab == ENavigationTab::Files) {
+#if WITH_EDITOR
+                    if (!SelectedPreset.IsValid())
+                    {
+                        return;
+                    }
+
+                    // Collect selected textures from the list view
+                    TArray<FTextureItem> SelectedItems;
+
+                    if (TextureListView.IsValid())
+                    {
+                        TextureListView->GetSelectedItems(SelectedItems);
+                    }
+
+                    // Fallback: if nothing is explicitly selected in the list but we
+                    // still have SelectedTexture (e.g., set programmatically), use that.
+                    if (SelectedItems.Num() == 0 && SelectedTexture.IsValid())
+                    {
+                        SelectedItems.Add(SelectedTexture);
+                    }
+
+                    if (SelectedItems.Num() == 0)
+                    {
+                        // Nothing to apply to
+                        return;
+                    }
+
+                    // If multiple, confirm with the user
+                    if (SelectedItems.Num() > 1)
+                    {
+                        UTexturePresetAsset* Preset = SelectedPreset.Get();
+                        const FString PresetLabel = Preset
+                            ? (!Preset->PresetName.IsNone()
+                                ? Preset->PresetName.ToString()
+                                : Preset->GetName())
+                            : TEXT("<Preset>");
+
+                        const FString Msg = FString::Printf(
+                            TEXT("Apply preset \"%s\" to %d textures?"),
+                            *PresetLabel,
+                            SelectedItems.Num());
+
+                        const EAppReturnType::Type Result = FMessageDialog::Open(
+                            EAppMsgType::YesNo,
+                            FText::FromString(Msg));
+
+                        if (Result != EAppReturnType::Yes)
+                        {
+                            return;
+                        }
+                    }
+
+                    // Apply preset to all selected textures
+                    for (const FTextureItem& Item : SelectedItems)
+                    {
+                        if (Item.IsValid())
+                        {
+                            UTexture2D* Texture = Item.Get();
+                            //TexturePresetLibrary::AssignPresetToTexture(SelectedPreset.Get(), Texture);
+                            TexturePresetLibrary::ApplyToTexture(SelectedPreset.Get(), Texture);
+                        }
+                    }
+#endif
+                }
+                else {
+                    //DetailsView->SetObject(FoundPreset);
+                }
             }
         }
 #endif
@@ -620,7 +696,7 @@ private:
             {
                 UTexture2D* Texture = Item.Get();
                 TexturePresetLibrary::AssignPresetToTexture(SelectedPreset.Get(), Texture);
-                TexturePresetLibrary::ApplyToTexture(SelectedPreset.Get(), Texture);
+                //TexturePresetLibrary::ApplyToTexture(SelectedPreset.Get(), Texture);
             }
         }
 #endif
