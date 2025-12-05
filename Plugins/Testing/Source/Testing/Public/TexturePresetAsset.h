@@ -102,4 +102,7 @@ public:
 
     UPROPERTY(EditAnywhere, Category = "Texture Preset")
     FTexturePresetSettings Settings;
+
+    UPROPERTY(VisibleAnywhere, Category = "Files")
+    TArray<FName> Files;
 };
