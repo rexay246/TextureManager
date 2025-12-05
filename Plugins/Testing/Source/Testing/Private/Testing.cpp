@@ -104,6 +104,13 @@ TSharedRef<SDockTab> FTestingModule::OnSpawnPluginTab(const FSpawnTabArgs& Args)
         SNew(SMyTwoColumnWidget)
         .DetailsViewWidget(DetailsView);
 
+    ManagerWidget = TwoColumnWidget;
+
+    if (SomeObjectToEdit && SomeObjectToEdit->IsA<UTexture2D>())
+    {
+        ManagerWidget->SetSelectedTexture(Cast<UTexture2D>(SomeObjectToEdit));
+    }
+
     // 4. Return as a Nomad tab
     return SNew(SDockTab)
         .TabRole(ETabRole::NomadTab)

@@ -13,10 +13,19 @@
 #include "Widgets/Views/SListView.h"
 #include "Widgets/Views/STableRow.h"
 #include "Widgets/Layout/SWidgetSwitcher.h"
-#include "Widgets/SBoxPanel.h"        // SVerticalBox / SHorizontalBox
+#include "Widgets/SBoxPanel.h"
 #include "Widgets/SNullWidget.h"
 #include "Styling/AppStyle.h"
 #include "UObject/WeakObjectPtrTemplates.h"
+#include <TexturePresetAsset.h>
+#include "TexturePresetLibrary.h"
+#include "TexturePresetUserData.h"
+#include "Engine/AssetUserData.h"
+
+#if WITH_EDITOR
+#include "AssetRegistry/AssetRegistryModule.h"
+#include "Modules/ModuleManager.h"
+#endif
 
 class IDetailsView;
 class UTexture2D;
@@ -46,9 +55,6 @@ public:
         DetailsView = InArgs._DetailsViewWidget;
         ActiveTab = ENavigationTab::Files;
 
-        // Preset combo options
-        RefreshPresetOptions();
-
         ChildSlot
             [
                 SNew(SSplitter)
@@ -67,6 +73,8 @@ public:
                         BuildRightColumn()
                     ]
             ];
+
+        RefreshPresetOptions();
     }
 
     // Called by module when a texture is imported / selected
@@ -80,6 +88,11 @@ public:
         }
 
         ActiveTab = ENavigationTab::Files;
+
+        // 1) Rebuild full preset list
+        RefreshPresetOptions();
+
+        // 2) Sync selection with the texture's assigned preset (if any)
         RefreshPresetOptionsFromSelection();
     }
 
@@ -99,7 +112,7 @@ private:
 
     // Presets list
     // For now, use UObject* as the preset type; later replace with your UTexturePresetAsset
-    using FPresetItem = TWeakObjectPtr<UObject>;
+    using FPresetItem = TWeakObjectPtr<UTexturePresetAsset>;
     TArray<FPresetItem> PresetItems;
     TSharedPtr< SListView<FPresetItem> > PresetListView;
 
@@ -326,12 +339,22 @@ private:
         FPresetItem Item,
         const TSharedRef<STableViewBase>& OwnerTable)
     {
-        // Until you have a real UTexturePresetAsset, just display a placeholder name.
         FText Label = FText::FromString(TEXT("<Preset>"));
 
         if (Item.IsValid())
         {
-            Label = FText::FromString(Item->GetName());
+            const UTexturePresetAsset* Preset = Item.Get();
+            if (Preset)
+            {
+                if (!Preset->PresetName.IsNone())
+                {
+                    Label = FText::FromName(Preset->PresetName);
+                }
+                else
+                {
+                    Label = FText::FromString(Preset->GetName());
+                }
+            }
         }
 
         return
@@ -357,11 +380,51 @@ private:
     void RefreshPresetOptions()
     {
         PresetOptions.Empty();
+        PresetItems.Empty();
+        CurrentPresetOption.Reset();
 
-        // TODO: query your FTexturePresetManager here
-        // For now, just stub:
-        PresetOptions.Add(MakeShared<FString>(TEXT("Custom")));
-        CurrentPresetOption = PresetOptions[0];
+#if WITH_EDITOR
+        FAssetRegistryModule& AssetRegistryModule =
+            FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+
+        FARFilter Filter;
+        Filter.ClassPaths.Add(UTexturePresetAsset::StaticClass()->GetClassPathName());
+        Filter.bRecursiveClasses = true;
+        Filter.PackagePaths.Add(FName(TEXT("/Game")));
+        Filter.bRecursivePaths = true;
+
+        TArray<FAssetData> PresetAssets;
+        AssetRegistryModule.Get().GetAssets(Filter, PresetAssets);
+
+        for (const auto& AssetData : PresetAssets)
+        {
+            UTexturePresetAsset* Preset = Cast<UTexturePresetAsset>(AssetData.GetAsset());
+            if (!Preset)
+            {
+                continue;
+            }
+
+            FPresetItem Item = Preset;
+            PresetItems.Add(Item);
+
+            const FString Label = !Preset->PresetName.IsNone()
+                ? Preset->PresetName.ToString()
+                : Preset->GetName();
+
+            PresetOptions.Add(MakeShared<FString>(Label));
+        }
+#endif
+
+        // Fallback if nothing found
+        if (PresetOptions.Num() == 0)
+        {
+            CurrentPresetOption = MakeShared<FString>(TEXT("Custom"));
+            PresetOptions.Add(CurrentPresetOption);
+        }
+        else
+        {
+            CurrentPresetOption = PresetOptions[0]; // temp default; can be overridden by selection sync
+        }
 
         if (PresetComboBox.IsValid())
         {
@@ -372,9 +435,48 @@ private:
 
     void RefreshPresetOptionsFromSelection()
     {
-        // TODO: read AssignedPreset from SelectedTexture’s user data,
-        // and update CurrentPresetOption accordingly.
-        RefreshPresetOptions();
+#if WITH_EDITOR
+        if (!SelectedTexture.IsValid() || PresetOptions.Num() == 0)
+        {
+            // Nothing to sync
+            return;
+        }
+
+        UTexture2D* Texture = SelectedTexture.Get();
+        if (!Texture)
+        {
+            return;
+        }
+
+        UTexturePresetUserData* UserData =
+            Cast<UTexturePresetUserData>(Texture->GetAssetUserDataOfClass(
+                UTexturePresetUserData::StaticClass()));
+
+        if (!UserData || !UserData->AssignedPreset)
+        {
+            // No preset assigned, leave CurrentPresetOption as-is (or choose "Custom" if you added it)
+            return;
+        }
+
+        UTexturePresetAsset* Assigned = UserData->AssignedPreset;
+
+        // Find matching preset in PresetItems
+        int32 Index = PresetItems.IndexOfByPredicate(
+            [Assigned](const FPresetItem& Item)
+            {
+                return Item.IsValid() && Item.Get() == Assigned;
+            });
+
+        if (PresetItems.IsValidIndex(Index) && PresetOptions.IsValidIndex(Index))
+        {
+            CurrentPresetOption = PresetOptions[Index];
+
+            if (PresetComboBox.IsValid())
+            {
+                PresetComboBox->SetSelectedItem(CurrentPresetOption);
+            }
+        }
+#endif
     }
 
     void OnPresetComboChanged(TSharedPtr<FString> NewSelection, ESelectInfo::Type)
@@ -392,7 +494,7 @@ private:
     {
         if (CanApplyPreset())
         {
-            // TODO: UTexturePresetLibrary::ApplyToTexture(SelectedPreset, SelectedTexture)
+            TexturePresetLibrary::ApplyToTexture(SelectedPreset.Get(), SelectedTexture.Get());
         }
         return FReply::Handled();
     }
@@ -404,10 +506,54 @@ private:
 
     FReply OnSaveAsPresetClicked()
     {
-        if (CanSaveAsPreset())
+#if WITH_EDITOR
+        if (!CanSaveAsPreset())
         {
-            // TODO: FTexturePresetManager::Get().CreatePresetFromTexture(SelectedTexture);
+            return FReply::Handled();
         }
+
+        UTexture2D* Texture = SelectedTexture.Get();
+        if (!Texture)
+        {
+            return FReply::Handled();
+        }
+
+        // Name and path convention — tweak as you like
+        const FName PresetName(*FString::Printf(TEXT("%s_Preset"), *Texture->GetName()));
+        const FString PresetPath = TEXT("/Game/TexturePresets");
+
+        UTexturePresetAsset* NewPreset =
+            TexturePresetLibrary::CreatePresetAssetFromTexture(
+                Texture,
+                PresetPath,
+                PresetName);
+
+        if (NewPreset)
+        {
+            // Attach preset to this texture via user data
+            TexturePresetLibrary::AssignPresetToTexture(NewPreset, Texture);
+
+            // Track in our in-memory list for this session
+            FPresetItem NewItem = NewPreset;
+            PresetItems.Add(NewItem);
+
+            const FString Label = !NewPreset->PresetName.IsNone()
+                ? NewPreset->PresetName.ToString()
+                : NewPreset->GetName();
+
+            CurrentPresetOption = MakeShared<FString>(Label);
+            PresetOptions.Add(CurrentPresetOption);
+
+            if (PresetComboBox.IsValid())
+            {
+                PresetComboBox->RefreshOptions();
+                PresetComboBox->SetSelectedItem(CurrentPresetOption);
+            }
+
+            SelectedPreset = NewItem;
+        }
+#endif
+
         return FReply::Handled();
     }
 };

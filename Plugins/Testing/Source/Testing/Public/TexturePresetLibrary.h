@@ -2,21 +2,27 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Kismet/BlueprintFunctionLibrary.h"
-#include "TexturePresetAsset.h"
-#include "Engine/Texture2D.h"
-#include "TexturePresetLibrary.generated.h"
 
-UCLASS()
-class UTexturePresetLibrary : public UBlueprintFunctionLibrary
+class UTexture2D;
+class UTexturePresetAsset;
+class UTexturePresetUserData;
+
+// Simple namespace, no UObject / UHT involved
+namespace TexturePresetLibrary
 {
-    GENERATED_BODY()
+	// Copy current texture settings into the preset asset
+	void CaptureFromTexture(UTexturePresetAsset* PresetAsset, UTexture2D* Texture);
 
-public:
+	// Apply preset settings onto a texture
+	void ApplyToTexture(UTexturePresetAsset* PresetAsset, UTexture2D* Texture);
 
-    UFUNCTION(BlueprintCallable, Category = "Texture Preset")
-    static void CaptureFromTexture(UTexturePresetAsset* PresetAsset, UTexture2D* Texture);
+	// Create a new preset asset (under PackagePath) from the texture's current settings
+	UTexturePresetAsset* CreatePresetAssetFromTexture(
+		UTexture2D* Texture,
+		const FString& PackagePath,
+		FName PresetName
+	);
 
-    UFUNCTION(BlueprintCallable, Category = "Texture Preset")
-    static void ApplyToTexture(UTexturePresetAsset* PresetAsset, UTexture2D* Texture);
-};
+	// Attach preset to texture via UTexturePresetUserData::AssignedPreset
+	void AssignPresetToTexture(UTexturePresetAsset* PresetAsset, UTexture2D* Texture);
+}
