@@ -358,10 +358,14 @@ private:
                 DetailsView->SetObject(SelectedTexture.Get());
             }
             else if (ActiveTab == ENavigationTab::Presets && SelectedPreset.IsValid())
-            {
+            {         
                 DetailsView->SetObject(SelectedPreset.Get());
+                PresetListView->SetSelection(SelectedPreset);
             }
         }
+
+        RefreshPresetOptions();
+        RefreshPresetOptionsFromSelection();
     }
 
     TSharedRef<ITableRow> GenerateTextureRow(
@@ -427,7 +431,7 @@ private:
         ActiveTab = ENavigationTab::Presets;
 
         if (DetailsView.IsValid())
-        {
+        {        
             DetailsView->SetObject(SelectedPreset.Get());
         }
 
@@ -627,7 +631,6 @@ private:
 #endif
     }
 
-
     bool CanApplyPreset() const
     {
         // As long as we have a preset chosen, we can *try* to apply –
@@ -696,14 +699,12 @@ private:
             {
                 UTexture2D* Texture = Item.Get();
                 TexturePresetLibrary::AssignPresetToTexture(SelectedPreset.Get(), Texture);
-                //TexturePresetLibrary::ApplyToTexture(SelectedPreset.Get(), Texture);
             }
         }
 #endif
 
         return FReply::Handled();
     }
-
 
     bool CanSaveAsPreset() const
     {

@@ -31,9 +31,8 @@ public class Testing : ModuleRules
                 "Core",
 				"CoreUObject",
 				"Engine",
-				// ... add other public dependencies that you statically link with here ...
 				"InputCore",
-				"PropertyEditor",   // <-- REQUIRED for IDetailsView
+				"PropertyEditor", 
 				"ApplicationCore"
             }
 			);
@@ -49,9 +48,9 @@ public class Testing : ModuleRules
 				"UnrealEd",
 				"EditorSubsystem",
 				"EditorFramework",
-				"AssetTools"
-				// ... add private dependencies that you statically link with here ...	
-			}
+				"AssetTools",
+                "ToolMenus",
+            }
 			);
 		
 		

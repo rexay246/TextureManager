@@ -19,7 +19,7 @@ namespace TexturePresetLibrary
 		FTexturePresetSettings& Out = PresetAsset->Settings;
 
 		// --- Core ---
-		Out.LODGroup = Texture->LODGroup;
+		Out.TextureGroup = Texture->LODGroup;
 		Out.LODBias = Texture->LODBias;
 		Out.CompressionSettings = Texture->CompressionSettings;
 		//Out.CompressionQuality = Texture->CompressionQuality;
@@ -30,8 +30,8 @@ namespace TexturePresetLibrary
 
 		// --- Filter / addressing ---
 		Out.Filter = Texture->Filter;
-		Out.AddressX = Texture->AddressX;
-		Out.AddressY = Texture->AddressY;
+		Out.XTilingMethod = Texture->AddressX;
+		Out.YTilingMethod = Texture->AddressY;
 		//Out.AddressZ = Texture->AddressZ;
 		//Out.MaxAnisotropy = Texture->MaxAnisotropy;
 
@@ -64,7 +64,7 @@ namespace TexturePresetLibrary
 		Texture->Modify();
 
 		// --- Core ---
-		Texture->LODGroup = In.LODGroup;
+		Texture->LODGroup = In.TextureGroup;
 		Texture->LODBias = In.LODBias;
 		Texture->CompressionSettings = In.CompressionSettings;
 		//Texture->CompressionQuality = In.CompressionQuality;
@@ -76,8 +76,8 @@ namespace TexturePresetLibrary
 
 		// --- Filter / addressing ---
 		Texture->Filter = In.Filter;
-		Texture->AddressX = In.AddressX;
-		Texture->AddressY = In.AddressY;
+		Texture->AddressX = In.XTilingMethod;
+		Texture->AddressY = In.YTilingMethod;
 		//Texture->AddressZ = In.AddressZ;
 		//Texture->MaxAnisotropy = In.MaxAnisotropy;
 
@@ -185,7 +185,10 @@ namespace TexturePresetLibrary
 			Texture->AddAssetUserData(UserData);
 		}
 
+		if (!UserData->AssignedPreset->Files.Find(Texture))
+			UserData->AssignedPreset->Files.Remove(Texture);
 		UserData->AssignedPreset = PresetAsset;
+		UserData->AssignedPreset->Files.Add(Texture);
 
 		Texture->MarkPackageDirty();
 		Texture->PostEditChange();

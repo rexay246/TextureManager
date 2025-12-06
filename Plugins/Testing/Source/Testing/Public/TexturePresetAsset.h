@@ -3,6 +3,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/Texture.h"
+#include "Engine/TextureDefines.h"
 #include "TexturePresetAsset.generated.h"
 
 USTRUCT(BlueprintType)
@@ -10,83 +11,69 @@ struct FTexturePresetSettings
 {
     GENERATED_BODY()
 
-    // -------- Core texture group / compression --------
+    // Level of Detail
 
-    UPROPERTY(EditAnywhere, Category = "Texture Preset")
-    TEnumAsByte<TextureGroup> LODGroup = TEXTUREGROUP_World;
-
-    UPROPERTY(EditAnywhere, Category = "Texture Preset")
-    int32 LODBias = 0;
-
-    UPROPERTY(EditAnywhere, Category = "Texture Preset")
-    TEnumAsByte<TextureCompressionSettings> CompressionSettings = TC_Default;
-
-    UPROPERTY(EditAnywhere, Category = "Texture Preset")
-    int32 CompressionQuality = 0; // maps to Texture->CompressionQuality
-
-    UPROPERTY(EditAnywhere, Category = "Texture Preset")
-    bool bSRGB = true;
-
-    // This is effectively “does the source have alpha?”, not strictly editable;
-    // we keep it as metadata for now.
-    UPROPERTY(EditAnywhere, Category = "Texture Preset")
-    bool bUseAlpha = false;
-
-    UPROPERTY(EditAnywhere, Category = "Texture Preset")
-    bool bFlipGreenChannel = false;
-
-    // -------- Filtering & addressing --------
-
-    UPROPERTY(EditAnywhere, Category = "Texture Preset")
-    TEnumAsByte<TextureFilter> Filter = TF_Default;
-
-    UPROPERTY(EditAnywhere, Category = "Texture Preset")
-    TEnumAsByte<TextureAddress> AddressX = TA_Wrap;
-
-    UPROPERTY(EditAnywhere, Category = "Texture Preset")
-    TEnumAsByte<TextureAddress> AddressY = TA_Wrap;
-
-    UPROPERTY(EditAnywhere, Category = "Texture Preset")
-    TEnumAsByte<TextureAddress> AddressZ = TA_Wrap;
-
-    UPROPERTY(EditAnywhere, Category = "Texture Preset")
-    int32 MaxAnisotropy = 8;
-
-    // -------- Mips / resolution --------
-
-    UPROPERTY(EditAnywhere, Category = "Texture Preset")
+    UPROPERTY(EditAnywhere, Category = "Level of Detail")
     TEnumAsByte<TextureMipGenSettings> MipGenSettings = TMGS_FromTextureGroup;
 
-    UPROPERTY(EditAnywhere, Category = "Texture Preset")
-    int32 MaxTextureSize = 0; // 0 = no override
+    UPROPERTY(EditAnywhere, Category = "Level of Detail")
+    int32 LODBias = 0;
 
-    UPROPERTY(EditAnywhere, Category = "Texture Preset")
-    uint8 NumCinematicMipLevels = 0;
+    UPROPERTY(EditAnywhere, Category = "Level of Detail")
+    TEnumAsByte<TextureGroup> TextureGroup = TEXTUREGROUP_World;
 
-    UPROPERTY(EditAnywhere, Category = "Texture Preset")
+    UPROPERTY(EditAnywhere, Category = "Level of Detail\Advanced")
     bool bPreserveBorder = false;
 
-    // Downscale settings (LOD bias / editor preview)
-    UPROPERTY(EditAnywhere, Category = "Texture Preset")
+    UPROPERTY(EditAnywhere, Category = "Level of Detail\Advanced")
     float DownscaleFactor = 1.0f;
 
-    //UPROPERTY(EditAnywhere, Category = "Texture Preset")
-    //TEnumAsByte<ETextureDownscaleOptions> DownscaleOptions = ETextureDownscaleOptions::Default;
+    UPROPERTY(EditAnywhere, Category = "Level of Detail\Advanced")
+    uint8 NumCinematicMipLevels = 0;
 
-    // -------- Streaming / residency --------
-
-    UPROPERTY(EditAnywhere, Category = "Texture Preset")
+    UPROPERTY(EditAnywhere, Category = "Level of Detail\Advanced")
     bool NeverStream = false;
 
-    UPROPERTY(EditAnywhere, Category = "Texture Preset")
+    UPROPERTY(EditAnywhere, Category = "Level of Detail\Advanced")
     bool bForceMiplevelsToBeResident = false;
 
-    UPROPERTY(EditAnywhere, Category = "Texture Preset")
-    float StreamingDistanceMultiplier = 1.0f;
+    // Compression
 
-    // -------- Virtual texture --------
+    UPROPERTY(EditAnywhere, Category = "Compression")
+    bool bUseAlpha = false;
 
-    UPROPERTY(EditAnywhere, Category = "Texture Preset")
+    UPROPERTY(EditAnywhere, Category = "Compression")
+    TEnumAsByte<TextureCompressionSettings> CompressionSettings = TC_Default;
+
+    UPROPERTY(EditAnywhere, Category = "Compression\Advanced")
+    int32 MaxTextureSize = 0; // 0 = no override
+
+    UPROPERTY(EditAnywhere, Category = "Compression\Advanced")
+    int32 CompressionQuality = 0; // maps to Texture->CompressionQuality
+
+    // Texture
+
+    UPROPERTY(EditAnywhere, Category = "Texture")
+    bool bSRGB = true;
+
+    UPROPERTY(EditAnywhere, Category = "Texture\Advanced")
+    TEnumAsByte<TextureAddress> XTilingMethod = TA_Wrap;
+
+    UPROPERTY(EditAnywhere, Category = "Texture\Advanced")
+    TEnumAsByte<TextureAddress> YTilingMethod = TA_Wrap;
+
+    UPROPERTY(EditAnywhere, Category = "Texture\Advanced")
+    TEnumAsByte<TextureAddress> ZTilingMethod = TA_Wrap;
+
+    UPROPERTY(EditAnywhere, Category = "Texture\Advanced")
+    bool bFlipGreenChannel = false;
+
+    UPROPERTY(EditAnywhere, Category = "Texture\Advanced")
+    TEnumAsByte<TextureFilter> Filter = TF_Default;
+
+    // Other
+
+    UPROPERTY(EditAnywhere, Category = "Other")
     bool VirtualTextureStreaming = false;
 };
 
@@ -100,9 +87,9 @@ public:
     UPROPERTY(EditAnywhere, Category = "Texture Preset")
     FName PresetName;
 
-    UPROPERTY(EditAnywhere, Category = "Texture Preset")
+    UPROPERTY(EditAnywhere, Category = "Texture Preset", meta = (ShowOnlyInnerProperties))
     FTexturePresetSettings Settings;
 
     UPROPERTY(VisibleAnywhere, Category = "Files")
-    TArray<FName> Files;
+    TArray<UTexture2D*> Files;
 };

@@ -19,8 +19,8 @@
 			]
 		},
 		{
-			"Name": "Testing",
-			"Enabled": true
+			"Name": "tedt",
+			"Enabled": false
 		}
 	]
 }

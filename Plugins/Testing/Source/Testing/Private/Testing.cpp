@@ -38,9 +38,12 @@ void FTestingModule::StartupModule()
     // Editor Tab
     //SomeObjectToEdit = NewObject<UObject>(GetTransientPackage(), UObject::StaticClass());
 
-    FGlobalTabmanager::Get()->RegisterNomadTabSpawner("MyDetailsTab",
+    FGlobalTabmanager::Get()->RegisterNomadTabSpawner("TextureManager",
         FOnSpawnTab::CreateRaw(this, &FTestingModule::OnSpawnPluginTab))
-        .SetDisplayName(FText::FromString("My Details Window"));
+       .SetMenuType(ETabSpawnerMenuType::Hidden)
+       .SetDisplayName(FText::FromString("Texture Manager"));
+
+    UToolMenus::RegisterStartupCallback(FSimpleMulticastDelegate::FDelegate::CreateRaw(this, &FTestingModule::RegisterMenus));
 }
 
 void FTestingModule::OnAssetImported(UFactory* Factory, UObject* Imported)
@@ -58,21 +61,25 @@ void FTestingModule::OnAssetImported(UFactory* Factory, UObject* Imported)
     if (Imported->IsA<UTexture>())
     {
         UE_LOG(LogTemp, Warning, TEXT("     --> This is a texture"));
+        UClass* type = Imported->GetClass();
+        if (Imported->IsA<UTexture2D>()) {
+            UE_LOG(LogTemp, Warning, TEXT("     --> This is a texture2D"));
+        }
 
         // Set the imported object to be shown in the details panel
         SomeObjectToEdit = Imported;
 
         // Check if the tab is already open. If not, spawn it.
-        if (!FGlobalTabmanager::Get()->FindExistingLiveTab(FName("MyDetailsTab")))
+        if (!FGlobalTabmanager::Get()->FindExistingLiveTab(FName("TextureManager")))
         {
             // Open the tab if it isn't already opened
-            FGlobalTabmanager::Get()->TryInvokeTab(FName("MyDetailsTab"));
+            FGlobalTabmanager::Get()->TryInvokeTab(FName("TextureManager"));
         }
 
         // If widget already exists, notify it of new texture (optional)
         if (ManagerWidget.IsValid())
         {
-            ManagerWidget->SetSelectedTexture(Cast<UTexture2D>(Imported));
+            //ManagerWidget->SetSelectedTexture(Cast<UTexture2D>(Imported));
             // 1) Add it to the Files list (this refreshes the view)
             ManagerWidget->AddImportedTexture(Cast<UTexture2D>(Imported));
 
@@ -124,10 +131,29 @@ TSharedRef<SDockTab> FTestingModule::OnSpawnPluginTab(const FSpawnTabArgs& Args)
         ];
 }
 
+void FTestingModule::RegisterMenus()
+{
+    UToolMenu* Menu = UToolMenus::Get()->ExtendMenu("LevelEditor.MainMenu.Window");
+
+    FToolMenuSection& Section = Menu->AddSection("TextureTools", FText::FromString("Texture Tools"));
+
+    Section.AddMenuEntry(
+        "Texture Manager",
+        FText::FromString("Texture Manager"),
+        FText::FromString("Manage texture presets"),
+        FSlateIcon(),
+        FUIAction(FExecuteAction::CreateLambda([]()
+            {
+                FGlobalTabmanager::Get()->TryInvokeTab(FName("TextureManager"));
+            }))
+    );
+}
+
 void FTestingModule::ShutdownModule()
 {
 	// This function may be called during shutdown to clean up your module.  For modules that support dynamic reloading,
 	// we call this function before unloading the module.
+    FGlobalTabmanager::Get()->UnregisterNomadTabSpawner("TextureManager");
 }
 
 #undef LOCTEXT_NAMESPACE
