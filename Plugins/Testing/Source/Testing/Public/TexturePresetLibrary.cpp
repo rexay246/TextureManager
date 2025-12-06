@@ -185,7 +185,7 @@ namespace TexturePresetLibrary
 			Texture->AddAssetUserData(UserData);
 		}
 
-		if (!UserData->AssignedPreset->Files.Find(Texture))
+		if (UserData->AssignedPreset && UserData->AssignedPreset->Files.Find(Texture) != INDEX_NONE)
 			UserData->AssignedPreset->Files.Remove(Texture);
 		UserData->AssignedPreset = PresetAsset;
 		UserData->AssignedPreset->Files.Add(Texture);

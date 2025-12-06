@@ -586,31 +586,6 @@ private:
                         return;
                     }
 
-                    // If multiple, confirm with the user
-                    if (SelectedItems.Num() > 1)
-                    {
-                        UTexturePresetAsset* Preset = SelectedPreset.Get();
-                        const FString PresetLabel = Preset
-                            ? (!Preset->PresetName.IsNone()
-                                ? Preset->PresetName.ToString()
-                                : Preset->GetName())
-                            : TEXT("<Preset>");
-
-                        const FString Msg = FString::Printf(
-                            TEXT("Apply preset \"%s\" to %d textures?"),
-                            *PresetLabel,
-                            SelectedItems.Num());
-
-                        const EAppReturnType::Type Result = FMessageDialog::Open(
-                            EAppMsgType::YesNo,
-                            FText::FromString(Msg));
-
-                        if (Result != EAppReturnType::Yes)
-                        {
-                            return;
-                        }
-                    }
-
                     // Apply preset to all selected textures
                     for (const FTextureItem& Item : SelectedItems)
                     {
