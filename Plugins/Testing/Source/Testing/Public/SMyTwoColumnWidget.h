@@ -21,6 +21,7 @@
 #include "TexturePresetLibrary.h"
 #include "TexturePresetUserData.h"
 #include "Engine/AssetUserData.h"
+#include "Widgets/Input/SSearchBox.h"
 
 #if WITH_EDITOR
 #include "AssetRegistry/AssetRegistryModule.h"
@@ -85,6 +86,8 @@ public:
             if (UTexture2D* Tex = Cast<UTexture2D>(AssetData.GetAsset()))
             {
                 TextureItems.Add(Tex);
+                AllTextureItems.Add(Tex);
+                FilteredTextureItems.Add(Tex);
             }
         }
 
@@ -112,6 +115,8 @@ public:
         if (!TextureItems.Contains(NewItem))
         {
             TextureItems.Add(NewItem);
+            AllTextureItems.Add(NewItem);
+            FilteredTextureItems.Add(NewItem);
         }
 
         // Refresh the list view
@@ -156,12 +161,17 @@ private:
     // Files list
     using FTextureItem = TWeakObjectPtr<UTexture2D>;
     TArray<FTextureItem> TextureItems;
+    TArray<FTextureItem> AllTextureItems;
+    TArray<FTextureItem> FilteredTextureItems;
+
     TSharedPtr< SListView<FTextureItem> > TextureListView;
 
     // Presets list
     // For now, use UObject* as the preset type; later replace with your UTexturePresetAsset
     using FPresetItem = TWeakObjectPtr<UTexturePresetAsset>;
     TArray<FPresetItem> PresetItems;
+    TArray<FPresetItem> AllPresetItems;
+    TArray<FPresetItem> FilteredPresetItems;
     TSharedPtr< SListView<FPresetItem> > PresetListView;
 
     // Current selection
@@ -170,8 +180,18 @@ private:
 
     // Preset dropdown
     TArray<TSharedPtr<FString>> PresetOptions;
+    TArray<TSharedPtr<FString>> FilterPresetOptions;
+    int FilterIndex = 0;
     TSharedPtr<FString> CurrentPresetOption;
+    TSharedPtr<FString> CurrentFilterOption;
     TSharedPtr<STextComboBox> PresetComboBox;
+    TSharedPtr<STextComboBox> PresetFilterComboBox;
+
+    TSharedPtr<SSearchBox> FilesSearchBox;
+    TSharedPtr<SSearchBox> PresetsSearchBox;
+
+    FString FilesSearchQuery;
+    FString PresetsSearchQuery;
 
     // ---------- UI construction ----------
 
@@ -196,6 +216,43 @@ private:
                             .Text(FText::FromString(TEXT("Files")))
                             + SSegmentedControl<ENavigationTab>::Slot(ENavigationTab::Presets)
                             .Text(FText::FromString(TEXT("Presets")))
+                    ]
+
+                // Search Box (changes with tab)
+                + SVerticalBox::Slot()
+                    .AutoHeight()
+                    .Padding(2)
+                    [
+                        SNew(SWidgetSwitcher)
+                            .WidgetIndex(this, &SMyTwoColumnWidget::GetWidgetIndex)
+
+                            // Files Search
+                            + SWidgetSwitcher::Slot()
+                            [
+                                SAssignNew(FilesSearchBox, SSearchBox)
+                                    .HintText(FText::FromString("Search Files..."))
+                                    .OnTextChanged(this, &SMyTwoColumnWidget::OnFilesSearchChanged)
+                            ]
+
+                            // Presets Search
+                            + SWidgetSwitcher::Slot()
+                            [
+                                SAssignNew(PresetsSearchBox, SSearchBox)
+                                    .HintText(FText::FromString("Search Presets..."))
+                                    .OnTextChanged(this, &SMyTwoColumnWidget::OnPresetsSearchChanged)
+                            ]
+                    ]
+
+                // Filter Preset dropdown
+                + SVerticalBox::Slot()
+                    .AutoHeight()
+                    .Padding(2)
+                    [
+                        SAssignNew(PresetFilterComboBox, STextComboBox)
+                            .OptionsSource(&FilterPresetOptions)
+                            .InitiallySelectedItem(CurrentFilterOption)
+                            .OnSelectionChanged(this, &SMyTwoColumnWidget::OnFilterComboChange)
+                            .Visibility(this, &SMyTwoColumnWidget::IsFilesChosen)
                     ]
 
                 // Body (depending on tab)
@@ -229,7 +286,7 @@ private:
         // You’ll populate TextureItems from your manager / import events
         TextureListView =
             SNew(SListView<FTextureItem>)
-            .ListItemsSource(&TextureItems)
+            .ListItemsSource(&FilteredTextureItems)
             .OnGenerateRow(this, &SMyTwoColumnWidget::GenerateTextureRow)
             .OnSelectionChanged(this, &SMyTwoColumnWidget::OnTextureSelected)
             .SelectionMode(ESelectionMode::Multi);
@@ -242,7 +299,7 @@ private:
         // You’ll populate PresetItems from your preset manager
         PresetListView =
             SNew(SListView<FPresetItem>)
-            .ListItemsSource(&PresetItems)
+            .ListItemsSource(&FilteredPresetItems)
             .OnGenerateRow(this, &SMyTwoColumnWidget::GeneratePresetRow)
             .OnSelectionChanged(this, &SMyTwoColumnWidget::OnPresetSelected)
             .SelectionMode(ESelectionMode::Single);
@@ -372,13 +429,28 @@ private:
         FTextureItem Item,
         const TSharedRef<STableViewBase>& OwnerTable)
     {
-        FText Label = FText::FromString(
-            Item.IsValid() ? Item->GetName() : TEXT("<invalid>"));
+        //FText Label = FText::FromString(
+        //    Item.IsValid() ? Item->GetName() : TEXT("<invalid>"));
+
+        //return
+        //    SNew(STableRow<FTextureItem>, OwnerTable)
+        //    [
+        //        SNew(STextBlock).Text(Label)
+        //    ];
+
+        if (!FilesSearchQuery.IsEmpty())
+        {
+            if (!Item.IsValid() || !Item->GetName().Contains(FilesSearchQuery))
+            {
+                return SNew(STableRow<FTextureItem>, OwnerTable)
+                    [SNullWidget::NullWidget];
+            }
+        }
 
         return
             SNew(STableRow<FTextureItem>, OwnerTable)
             [
-                SNew(STextBlock).Text(Label)
+                SNew(STextBlock).Text(FText::FromString(Item->GetName()))
             ];
     }
 
@@ -400,28 +472,47 @@ private:
         FPresetItem Item,
         const TSharedRef<STableViewBase>& OwnerTable)
     {
-        FText Label = FText::FromString(TEXT("<Preset>"));
+        //FText Label = FText::FromString(TEXT("<Preset>"));
 
-        if (Item.IsValid())
+        //if (Item.IsValid())
+        //{
+        //    const UTexturePresetAsset* Preset = Item.Get();
+        //    if (Preset)
+        //    {
+        //        if (!Preset->PresetName.IsNone())
+        //        {
+        //            Label = FText::FromName(Preset->PresetName);
+        //        }
+        //        else
+        //        {
+        //            Label = FText::FromString(Preset->GetName());
+        //        }
+        //    }
+        //}
+
+        //return
+        //    SNew(STableRow<FPresetItem>, OwnerTable)
+        //    [
+        //        SNew(STextBlock).Text(Label)
+        //    ];
+
+        FString Name = Item.IsValid()
+            ? Item->GetName()
+            : TEXT("");
+
+        if (!PresetsSearchQuery.IsEmpty())
         {
-            const UTexturePresetAsset* Preset = Item.Get();
-            if (Preset)
+            if (!Name.Contains(PresetsSearchQuery))
             {
-                if (!Preset->PresetName.IsNone())
-                {
-                    Label = FText::FromName(Preset->PresetName);
-                }
-                else
-                {
-                    Label = FText::FromString(Preset->GetName());
-                }
+                return SNew(STableRow<FPresetItem>, OwnerTable)
+                    [SNullWidget::NullWidget];
             }
         }
 
         return
             SNew(STableRow<FPresetItem>, OwnerTable)
             [
-                SNew(STextBlock).Text(Label)
+                SNew(STextBlock).Text(FText::FromString(Name))
             ];
     }
 
@@ -441,7 +532,12 @@ private:
     void RefreshPresetOptions()
     {
         PresetOptions.Empty();
+        FilterPresetOptions.Empty();
+        auto AdditionalFilter = MakeShared<FString>(TEXT("All"));
+        FilterPresetOptions.Add(AdditionalFilter);
         PresetItems.Empty();
+        AllPresetItems.Empty();
+        FilteredPresetItems.Empty();
         CurrentPresetOption.Reset();
 
 #if WITH_EDITOR
@@ -467,12 +563,15 @@ private:
 
             FPresetItem Item = Preset;
             PresetItems.Add(Item);
+            AllPresetItems.Add(Item);
+            FilteredPresetItems.Add(Item);
 
             const FString Label = !Preset->PresetName.IsNone()
                 ? Preset->PresetName.ToString()
                 : Preset->GetName();
 
             PresetOptions.Add(MakeShared<FString>(Label));
+            FilterPresetOptions.Add(MakeShared<FString>(Label));
         }
 #endif
 
@@ -484,13 +583,17 @@ private:
         }
         else
         {
-            CurrentPresetOption = PresetOptions[0]; // temp default; can be overridden by selection sync
+            CurrentPresetOption = PresetOptions[0];
+            CurrentFilterOption = FilterPresetOptions[FilterIndex];
         }
 
         if (PresetComboBox.IsValid())
         {
             PresetComboBox->RefreshOptions();
             PresetComboBox->SetSelectedItem(CurrentPresetOption);
+
+            PresetFilterComboBox->RefreshOptions();
+            PresetFilterComboBox->SetSelectedItem(CurrentFilterOption);
         }
     }
 
@@ -535,9 +638,44 @@ private:
             if (PresetComboBox.IsValid())
             {
                 PresetComboBox->SetSelectedItem(CurrentPresetOption);
+                PresetFilterComboBox->SetSelectedItem(CurrentFilterOption);
             }
         }
 #endif
+    }
+
+    void OnFilterComboChange(TSharedPtr<FString> NewSelection, ESelectInfo::Type)
+    {
+        if (!NewSelection.IsValid()) {
+            CurrentFilterOption = FilterPresetOptions[0];
+            return;
+        }
+
+        FilterIndex = FilterPresetOptions.IndexOfByKey(NewSelection);
+
+        CurrentFilterOption = NewSelection;
+        FilteredTextureItems.Empty();
+
+        UTexturePresetAsset* FoundPreset =
+            TexturePresetLibrary::FindPresetByName(*CurrentFilterOption);
+
+
+        for (const FTextureItem& Item : AllTextureItems)
+        {
+            UTexturePresetUserData* UserData = Cast<UTexturePresetUserData>(
+                Item->GetAssetUserDataOfClass(UTexturePresetUserData::StaticClass()));
+
+            if (!Item.IsValid()) continue;
+
+            if ((FilesSearchQuery.IsEmpty() || Item->GetName().Contains(FilesSearchQuery)) &&
+                (FoundPreset == nullptr || (UserData != nullptr && UserData->AssignedPreset == FoundPreset)))
+            {
+                FilteredTextureItems.Add(Item);
+            }
+        }
+
+        if (TextureListView.IsValid())
+            TextureListView->RequestListRefresh();
     }
 
     void OnPresetComboChanged(TSharedPtr<FString> NewSelection, ESelectInfo::Type)
@@ -718,6 +856,8 @@ private:
             // Track in our in-memory list for this session
             FPresetItem NewItem = NewPreset;
             PresetItems.Add(NewItem);
+            AllPresetItems.Add(NewItem);
+            FilteredPresetItems.Add(NewItem);
 
             const FString Label = !NewPreset->PresetName.IsNone()
                 ? NewPreset->PresetName.ToString()
@@ -725,6 +865,7 @@ private:
 
             CurrentPresetOption = MakeShared<FString>(Label);
             PresetOptions.Add(CurrentPresetOption);
+            FilterPresetOptions.Add(CurrentPresetOption);
 
             if (PresetComboBox.IsValid())
             {
@@ -737,5 +878,54 @@ private:
 #endif
 
         return FReply::Handled();
+    }
+
+    void OnFilesSearchChanged(const FText& InText)
+    {
+        FilesSearchQuery = InText.ToString();
+        FilteredTextureItems.Empty();
+
+        UTexturePresetAsset* FoundPreset =
+            TexturePresetLibrary::FindPresetByName(*CurrentFilterOption);
+
+        for (const FTextureItem& Item : AllTextureItems)
+        {
+            UTexturePresetUserData* UserData = Cast<UTexturePresetUserData>(
+                Item->GetAssetUserDataOfClass(UTexturePresetUserData::StaticClass()));
+
+            if (!Item.IsValid()) continue;
+
+            if ((FilesSearchQuery.IsEmpty() || Item->GetName().Contains(FilesSearchQuery)) &&
+                (FoundPreset == nullptr || (UserData != nullptr && UserData->AssignedPreset == FoundPreset)))
+            {
+                FilteredTextureItems.Add(Item);
+            }
+        }
+
+        if (TextureListView.IsValid())
+            TextureListView->RequestListRefresh();
+    }
+
+    void OnPresetsSearchChanged(const FText& InText)
+    {
+        PresetsSearchQuery = InText.ToString();
+        FilteredPresetItems.Empty();
+
+        for (const FPresetItem& Item : AllPresetItems)
+        {
+            if (!Item.IsValid()) continue;
+
+            const FString Label = !Item->PresetName.IsNone()
+                ? Item->PresetName.ToString()
+                : Item->GetName();
+
+            if (PresetsSearchQuery.IsEmpty() || Label.Contains(PresetsSearchQuery))
+            {
+                FilteredPresetItems.Add(Item);
+            }
+        }
+
+        if (PresetListView.IsValid())
+            PresetListView->RequestListRefresh();
     }
 };
