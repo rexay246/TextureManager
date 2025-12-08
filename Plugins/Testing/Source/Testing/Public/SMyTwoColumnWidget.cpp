@@ -186,7 +186,7 @@ TSharedRef<SWidget> SMyTwoColumnWidget::BuildFilesList()
 {
 	SAssignNew(TextureListView, SListView<FTextureItem>)
 		.ListItemsSource(&FilteredTextureItems)
-		.SelectionMode(ESelectionMode::Single)
+		.SelectionMode(ESelectionMode::Multi)
 		.OnGenerateRow(this, &SMyTwoColumnWidget::GenerateTextureRow)
 		.OnSelectionChanged(this, &SMyTwoColumnWidget::OnTextureSelected);
 
@@ -197,7 +197,7 @@ TSharedRef<SWidget> SMyTwoColumnWidget::BuildPresetsList()
 {
 	SAssignNew(PresetListView, SListView<FPresetItem>)
 		.ListItemsSource(&FilteredPresetItems)
-		.SelectionMode(ESelectionMode::Single)
+		.SelectionMode(ESelectionMode::Multi)
 		.OnGenerateRow(this, &SMyTwoColumnWidget::GeneratePresetRow)
 		.OnSelectionChanged(this, &SMyTwoColumnWidget::OnPresetSelected);
 
