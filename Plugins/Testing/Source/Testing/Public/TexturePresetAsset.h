@@ -4,6 +4,8 @@
 #include "CoreMinimal.h"
 #include "Engine/Texture.h"
 #include "Engine/TextureDefines.h"
+
+#include "Math/Color.h"
 #include "TexturePresetAsset.generated.h"
 
 USTRUCT(BlueprintType)
@@ -70,6 +72,41 @@ struct FTexturePresetSettings
 
     UPROPERTY(EditAnywhere, Category = "Texture\Advanced")
     TEnumAsByte<TextureFilter> Filter = TF_Default;
+
+    // Adjustments
+
+    UPROPERTY(EditAnywhere, Category = "Texture\Adjustments")
+    float Brightness = 1;
+
+    UPROPERTY(EditAnywhere, Category = "Texture\Adjustments")
+    float BrightnessCurve = 1;
+
+    UPROPERTY(EditAnywhere, Category = "Texture\Adjustments")
+    float Vibrance = 0;
+
+    UPROPERTY(EditAnywhere, Category = "Texture\Adjustments")
+    float Saturation = 1;
+
+    UPROPERTY(EditAnywhere, Category = "Texture\Adjustments")
+    float RGBCurve = 1;
+
+    UPROPERTY(EditAnywhere, Category = "Texture\Adjustments")
+    float Hue = 0;
+
+    UPROPERTY(EditAnywhere, Category = "Texture\Adjustments")
+    float MinAlpha = 0;
+
+    UPROPERTY(EditAnywhere, Category = "Texture\Adjustments")
+    float MaxAlpha = 1;
+
+    UPROPERTY(EditAnywhere, Category = "Texture\Adjustments")
+    bool ChromaKeyTexture = false;
+
+    UPROPERTY(EditAnywhere, Category = "Texture\Adjustments")
+    float ChromaKeyThreshold = 0.003f;
+
+    UPROPERTY(EditAnywhere, Category = "Texture\Adjustments")
+	FColor ChromaKeyColor = FColor::Magenta;
 
     // Other
 
