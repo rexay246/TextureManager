@@ -19,6 +19,7 @@
 #include "Widgets/Layout/SWidgetSwitcher.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Input/SButton.h"
+#include "Widgets/Input/SSearchBox.h"
 
 #include "Editor.h"
 #include "Framework/Application/SlateApplication.h"
@@ -115,6 +116,46 @@ TSharedRef<SWidget> SMyTwoColumnWidget::BuildLeftColumn()
 						.Text(NSLOCTEXT("TextureManager", "PresetsTab", "Presets"))
 				]
 
+				// Search Box (changes with tab)
+				+ SVerticalBox::Slot()
+					.AutoHeight()
+					.Padding(2)
+					[
+						SNew(SWidgetSwitcher)
+							.WidgetIndex_Lambda([this]()
+								{
+									return (ActiveTab == ENavigationTab::Files) ? 0 : 1;
+								})
+
+							// Files Search
+							+ SWidgetSwitcher::Slot()
+							[
+								SAssignNew(FilesSearchBox, SSearchBox)
+									.HintText(FText::FromString("Search Files..."))
+									.OnTextChanged(this, &SMyTwoColumnWidget::OnFilesSearchChanged)
+							]
+
+							// Presets Search
+							+ SWidgetSwitcher::Slot()
+							[
+								SAssignNew(PresetsSearchBox, SSearchBox)
+									.HintText(FText::FromString("Search Presets..."))
+									.OnTextChanged(this, &SMyTwoColumnWidget::OnPresetsSearchChanged)
+							]
+					]
+
+				// Filter Preset dropdown
+				+ SVerticalBox::Slot()
+					.AutoHeight()
+					.Padding(2)
+					[
+						SAssignNew(PresetFilterComboBox, STextComboBox)
+							.OptionsSource(&FilterPresetLabels)
+							.InitiallySelectedItem(CurrentFilterOption)
+							.OnSelectionChanged(this, &SMyTwoColumnWidget::OnFilterComboChange)
+							.Visibility(this, &SMyTwoColumnWidget::IsFilesChosen)
+					]
+
 				// Body switched by tab: Files list / Presets list
 				+ SVerticalBox::Slot()
 				.FillHeight(1.f)
@@ -144,7 +185,7 @@ TSharedRef<SWidget> SMyTwoColumnWidget::BuildLeftColumn()
 TSharedRef<SWidget> SMyTwoColumnWidget::BuildFilesList()
 {
 	SAssignNew(TextureListView, SListView<FTextureItem>)
-		.ListItemsSource(&TextureItems)
+		.ListItemsSource(&FilteredTextureItems)
 		.SelectionMode(ESelectionMode::Single)
 		.OnGenerateRow(this, &SMyTwoColumnWidget::GenerateTextureRow)
 		.OnSelectionChanged(this, &SMyTwoColumnWidget::OnTextureSelected);
@@ -155,7 +196,7 @@ TSharedRef<SWidget> SMyTwoColumnWidget::BuildFilesList()
 TSharedRef<SWidget> SMyTwoColumnWidget::BuildPresetsList()
 {
 	SAssignNew(PresetListView, SListView<FPresetItem>)
-		.ListItemsSource(&PresetItems)
+		.ListItemsSource(&FilteredPresetItems)
 		.SelectionMode(ESelectionMode::Single)
 		.OnGenerateRow(this, &SMyTwoColumnWidget::GeneratePresetRow)
 		.OnSelectionChanged(this, &SMyTwoColumnWidget::OnPresetSelected);
@@ -192,6 +233,7 @@ TSharedRef<SWidget> SMyTwoColumnWidget::BuildRightColumn()
 							SAssignNew(PresetComboBox, STextComboBox)
 								.OptionsSource(&PresetLabels)
 								.OnSelectionChanged(this, &SMyTwoColumnWidget::OnPresetComboChanged)
+								.IsEnabled(this, &SMyTwoColumnWidget::IsPresetComboEnabled)
 						]
 						+ SHorizontalBox::Slot()
 						.AutoWidth()
@@ -268,7 +310,9 @@ void SMyTwoColumnWidget::OnTabChanged(ENavigationTab NewTab)
 
 void SMyTwoColumnWidget::RefreshTextureList()
 {
-	TextureItems.Reset();
+	//TextureItems.Reset();
+	AllTextureItems.Reset();
+	FilteredTextureItems.Reset();
 
 #if WITH_EDITOR
 	FAssetRegistryModule& AssetRegistryModule =
@@ -286,7 +330,9 @@ void SMyTwoColumnWidget::RefreshTextureList()
 	{
 		if (UTexture2D* Texture = Cast<UTexture2D>(Data.GetAsset()))
 		{
-			TextureItems.Add(Texture);
+			//TextureItems.Add(Texture);
+			AllTextureItems.Add(Texture);
+			FilteredTextureItems.Add(Texture);
 		}
 	}
 #endif
@@ -299,14 +345,26 @@ void SMyTwoColumnWidget::RefreshTextureList()
 
 void SMyTwoColumnWidget::RefreshPresetList()
 {
-	PresetItems.Reset();
+	//PresetItems.Reset();
+	AllPresetItems.Reset();
+	FilteredPresetItems.Reset();
+
 	PresetChoices.Reset();
 	PresetLabels.Reset();
+
+	FilterPresetLabels.Reset();
+	FilterPresetChoices.Reset();
 
 	// Index 0 = <NONE>
 	NonePresetOption = MakeShared<FString>(TEXT("<NONE>"));
 	PresetLabels.Add(NonePresetOption);
 	PresetChoices.Add(nullptr);
+
+	AllPresetOption = MakeShared<FString>(TEXT("All"));
+	FilterPresetLabels.Add(AllPresetOption);
+	FilterPresetLabels.Add(NonePresetOption);
+	FilterPresetChoices.Add(nullptr);
+	FilterPresetChoices.Add(nullptr);
 
 #if WITH_EDITOR
 	FAssetRegistryModule& AssetRegistryModule =
@@ -324,15 +382,18 @@ void SMyTwoColumnWidget::RefreshPresetList()
 	{
 		if (UTexturePresetAsset* Preset = Cast<UTexturePresetAsset>(Data.GetAsset()))
 		{
-			PresetItems.Add(Preset);      // for list view
-
+			//PresetItems.Add(Preset);      // for list view
+			AllPresetItems.Add(Preset);
+			FilteredPresetItems.Add(Preset);
 			PresetChoices.Add(Preset);    // for combo
+			FilterPresetChoices.Add(Preset);
 			const FString Label =
 				!Preset->PresetName.IsNone()
 				? Preset->PresetName.ToString()
 				: Preset->GetName();
 
 			PresetLabels.Add(MakeShared<FString>(Label));
+			FilterPresetLabels.Add(MakeShared<FString>(Label));
 		}
 	}
 #endif
@@ -349,6 +410,7 @@ void SMyTwoColumnWidget::RefreshPresetList()
 
 	// Re-select current preset in combo if any
 	SelectPresetInCombo(SelectedPreset.Get());
+	CurrentFilterOption = FilterPresetLabels[FilterIndex];
 }
 
 bool SMyTwoColumnWidget::PromptForPresetName(const FString& DefaultName, FString& OutName, const FString& FixedPath)
@@ -895,7 +957,7 @@ void SMyTwoColumnWidget::AddImportedTexture(UTexture2D* NewTexture)
 	FTextureItem NewItem = NewTexture;
 
 	// Avoid duplicates
-	for (const FTextureItem& Existing : TextureItems)
+	for (const FTextureItem& Existing : AllTextureItems)
 	{
 		if (Existing == NewItem)
 		{
@@ -903,7 +965,9 @@ void SMyTwoColumnWidget::AddImportedTexture(UTexture2D* NewTexture)
 		}
 	}
 
-	TextureItems.Add(NewItem);
+	//TextureItems.Add(NewItem);
+	AllTextureItems.Add(NewItem);
+	FilteredTextureItems.Add(NewItem);
 
 	if (TextureListView.IsValid())
 	{
@@ -926,7 +990,7 @@ void SMyTwoColumnWidget::SetSelectedTexture(UTexture2D* NewTexture)
 
 	// Ensure it's in the list
 	bool bFound = false;
-	for (const FTextureItem& Existing : TextureItems)
+	for (const FTextureItem& Existing : AllTextureItems)
 	{
 		if (Existing == Item)
 		{
@@ -936,7 +1000,9 @@ void SMyTwoColumnWidget::SetSelectedTexture(UTexture2D* NewTexture)
 	}
 	if (!bFound)
 	{
-		TextureItems.Add(Item);
+		//TextureItems.Add(Item);
+		AllTextureItems.Add(Item);
+		FilteredTextureItems.Add(Item);
 		if (TextureListView.IsValid())
 		{
 			TextureListView->RequestListRefresh();
@@ -954,4 +1020,93 @@ void SMyTwoColumnWidget::SetSelectedTexture(UTexture2D* NewTexture)
 		// Fallback if list view not yet constructed
 		OnTextureSelected(Item, ESelectInfo::Direct);
 	}
+}
+
+void SMyTwoColumnWidget::OnFilterComboChange(TSharedPtr<FString> NewSelection, ESelectInfo::Type)
+{
+	if (!NewSelection.IsValid())
+	{
+		return;
+	}
+
+	// Find index of selection by pointer (not by string contents)
+	const int32 Index = FilterPresetLabels.Find(NewSelection);
+	if (Index == INDEX_NONE)
+	{
+		return;
+	}
+
+	CurrentFilterOption = NewSelection;
+	FilteredTextureItems.Empty();
+
+	UTexturePresetAsset* FoundPreset =
+		TexturePresetLibrary::FindPresetByName(*CurrentFilterOption);
+
+
+	for (const FTextureItem& Item : AllTextureItems)
+	{
+		UTexturePresetUserData* UserData = Cast<UTexturePresetUserData>(
+			Item->GetAssetUserDataOfClass(UTexturePresetUserData::StaticClass()));
+
+		if (!Item.IsValid()) continue;
+
+		if (FoundPreset == nullptr && NewSelection == NonePresetOption && (UserData == nullptr)) {
+			FilteredTextureItems.Add(Item);
+		}
+		else if (FoundPreset != nullptr && (UserData != nullptr && UserData->AssignedPreset == FoundPreset))
+		{
+			FilteredTextureItems.Add(Item);
+		}
+		else if (FoundPreset == nullptr && NewSelection == AllPresetOption) {
+			FilteredTextureItems.Add(Item);
+		}
+	}
+
+	if (TextureListView.IsValid())
+		TextureListView->RequestListRefresh();
+}
+
+void SMyTwoColumnWidget::OnFilesSearchChanged(const FText& InText)
+{
+	FilesSearchQuery = InText.ToString();
+	FilteredTextureItems.Empty();
+
+	for (const FTextureItem& Item : AllTextureItems)
+	{
+		UTexturePresetUserData* UserData = Cast<UTexturePresetUserData>(
+			Item->GetAssetUserDataOfClass(UTexturePresetUserData::StaticClass()));
+
+		if (!Item.IsValid()) continue;
+
+		if (FilesSearchQuery.IsEmpty() || Item->GetName().Contains(FilesSearchQuery))
+		{
+			FilteredTextureItems.Add(Item);
+		}
+	}
+
+	if (TextureListView.IsValid())
+		TextureListView->RequestListRefresh();
+}
+
+void SMyTwoColumnWidget::OnPresetsSearchChanged(const FText& InText)
+{
+	PresetsSearchQuery = InText.ToString();
+	FilteredPresetItems.Empty();
+
+	for (const FPresetItem& Item : AllPresetItems)
+	{
+		if (!Item.IsValid()) continue;
+
+		const FString Label = !Item->PresetName.IsNone()
+			? Item->PresetName.ToString()
+			: Item->GetName();
+
+		if (PresetsSearchQuery.IsEmpty() || Label.Contains(PresetsSearchQuery))
+		{
+			FilteredPresetItems.Add(Item);
+		}
+	}
+
+	if (PresetListView.IsValid())
+		PresetListView->RequestListRefresh();
 }

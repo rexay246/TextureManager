@@ -58,11 +58,15 @@ private:
 	TSharedPtr<IDetailsView> DetailsView;
 
 	// Files list (left column)
-	TArray<FTextureItem> TextureItems;
+	//TArray<FTextureItem> TextureItems;
+	TArray<FTextureItem> AllTextureItems;
+	TArray<FTextureItem> FilteredTextureItems;
 	TSharedPtr<SListView<FTextureItem>> TextureListView;
 
 	// Presets list (right / Presets tab)
-	TArray<FPresetItem> PresetItems;
+	//TArray<FPresetItem> PresetItems;
+	TArray<FPresetItem> AllPresetItems;
+	TArray<FPresetItem> FilteredPresetItems;
 	TSharedPtr<SListView<FPresetItem>> PresetListView;
 
 	// Current selection
@@ -76,6 +80,18 @@ private:
 	TSharedPtr<FString> NonePresetOption;
 	TSharedPtr<FString> CurrentPresetOption;
 	TSharedPtr<STextComboBox> PresetComboBox;
+
+	TArray<TWeakObjectPtr<UTexturePresetAsset>> FilterPresetChoices;
+	TArray<TSharedPtr<FString>> FilterPresetLabels;
+	int FilterIndex = 0;
+	TSharedPtr<FString> AllPresetOption;
+	TSharedPtr<FString> CurrentFilterOption;
+	TSharedPtr<STextComboBox> PresetFilterComboBox;
+
+	TSharedPtr<SSearchBox> FilesSearchBox;
+	TSharedPtr<SSearchBox> PresetsSearchBox;
+	FString FilesSearchQuery;
+	FString PresetsSearchQuery;
 
 	// Dirty flag when the selected texture's settings diverge from its preset
 	bool bPendingPresetChange = false;
@@ -119,4 +135,18 @@ private:
 	void OnAnyPropertyChanged(UObject* Object, FPropertyChangedEvent& Event);
 	void InitializePropertyWatcher();
 	void ShutdownPropertyWatcher();
+
+	void OnFilterComboChange(TSharedPtr<FString> NewSelection, ESelectInfo::Type);
+	void OnFilesSearchChanged(const FText& InText);
+	void OnPresetsSearchChanged(const FText& InText);
+
+	EVisibility IsFilesChosen() const
+	{
+		return ActiveTab == ENavigationTab::Files ? EVisibility::Visible : EVisibility::Collapsed;
+	}
+
+	bool IsPresetComboEnabled() const
+	{
+		return ActiveTab == ENavigationTab::Files;
+	}
 };
