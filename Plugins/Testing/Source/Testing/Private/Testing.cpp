@@ -106,24 +106,21 @@ TSharedRef<SDockTab> FTestingModule::OnSpawnPluginTab(const FSpawnTabArgs& Args)
     TSharedPtr<IDetailsView> DetailsView = PropEditorModule.CreateDetailView(ViewArgs);
 
     // Example: Set the object to show in the details panel (replace with yours)
-    if (SomeObjectToEdit)
-    {
-        DetailsView->SetObject(SomeObjectToEdit);
-    }
+    DetailsView->SetObject(nullptr);
 
-    // 3. Build your custom two-column layout widget
+    // Build your custom two-column layout widget
     TSharedRef<SMyTwoColumnWidget> TwoColumnWidget =
         SNew(SMyTwoColumnWidget)
         .DetailsViewWidget(DetailsView);
 
     ManagerWidget = TwoColumnWidget;
 
-    if (SomeObjectToEdit && SomeObjectToEdit->IsA<UTexture2D>())
+    /*if (SomeObjectToEdit && SomeObjectToEdit->IsA<UTexture2D>())
     {
         ManagerWidget->SetSelectedTexture(Cast<UTexture2D>(SomeObjectToEdit));
-    }
+    }*/
 
-    // 4. Return as a Nomad tab
+    // Return as a Nomad tab
     return SNew(SDockTab)
         .TabRole(ETabRole::NomadTab)
         [

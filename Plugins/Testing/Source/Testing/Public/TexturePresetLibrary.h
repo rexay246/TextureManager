@@ -26,4 +26,7 @@ namespace TexturePresetLibrary
 	// Attach preset to texture via UTexturePresetUserData::AssignedPreset
 	void AssignPresetToTexture(UTexturePresetAsset* PresetAsset, UTexture2D* Texture);
 	UTexturePresetAsset* FindPresetByName(const FString& InPresetName, const FString& SearchRootPath = TEXT("/Game"));
+
+	TArray<UTexture2D*> GetAllTexturesUsingPreset(UTexturePresetAsset* PresetAsset);
+	void UpdatePresetFromTexture(UTexturePresetAsset* PresetAsset, UTexture2D* Texture);
 }

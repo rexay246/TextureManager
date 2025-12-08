@@ -246,4 +246,65 @@ namespace TexturePresetLibrary
 		return nullptr;
 	}
 
+	TArray<UTexture2D*> GetAllTexturesUsingPreset(UTexturePresetAsset* PresetAsset)
+	{
+		TArray<UTexture2D*> Result;
+
+#if WITH_EDITOR
+		if (!PresetAsset)
+		{
+			return Result;
+		}
+
+		FAssetRegistryModule& AssetRegistryModule =
+			FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+
+		FARFilter Filter;
+		Filter.ClassPaths.Add(UTexture2D::StaticClass()->GetClassPathName());
+		Filter.bRecursivePaths = true;
+		Filter.PackagePaths.Add(FName(TEXT("/Game"))); // Limit to /Game; tweak if needed
+
+		TArray<FAssetData> TextureAssets;
+		AssetRegistryModule.Get().GetAssets(Filter, TextureAssets);
+
+		for (const FAssetData& Data : TextureAssets)
+		{
+			UTexture2D* Texture = Cast<UTexture2D>(Data.GetAsset());
+			if (!Texture)
+			{
+				continue;
+			}
+
+			UTexturePresetUserData* UserData =
+				Cast<UTexturePresetUserData>(
+					Texture->GetAssetUserDataOfClass(UTexturePresetUserData::StaticClass()));
+
+			if (UserData && UserData->AssignedPreset == PresetAsset)
+			{
+				Result.Add(Texture);
+			}
+		}
+#endif
+		return Result;
+	}
+
+	void UpdatePresetFromTexture(UTexturePresetAsset* PresetAsset, UTexture2D* Texture)
+	{
+#if WITH_EDITOR
+		if (!PresetAsset || !Texture)
+		{
+			return;
+		}
+
+		// Reuse your existing capture helper
+		CaptureFromTexture(PresetAsset, Texture);
+
+		// Rebuild the Files list to reflect all users of this preset
+		TArray<UTexture2D*> LinkedTextures = GetAllTexturesUsingPreset(PresetAsset);
+
+		PresetAsset->Modify();
+		PresetAsset->Files = LinkedTextures;
+		PresetAsset->MarkPackageDirty();
+#endif
+	}
 }

@@ -1,741 +1,122 @@
 #pragma once
 
+#include "CoreMinimal.h"
 #include "Widgets/SCompoundWidget.h"
-#include "Widgets/Layout/SBorder.h"
-#include "Widgets/Layout/SBox.h"
-#include "Widgets/Layout/SSplitter.h"
-#include "Widgets/Layout/SScrollBox.h"
-#include "Widgets/SOverlay.h"
-#include "Widgets/Text/STextBlock.h"
-#include "Widgets/Input/SButton.h"
+#include "Widgets/DeclarativeSyntaxSupport.h"
+#include "Widgets/Views/SListView.h"
 #include "Widgets/Input/STextComboBox.h"
 #include "Widgets/Input/SSegmentedControl.h"
-#include "Widgets/Views/SListView.h"
-#include "Widgets/Views/STableRow.h"
-#include "Widgets/Layout/SWidgetSwitcher.h"
-#include "Widgets/SBoxPanel.h"
-#include "Widgets/SNullWidget.h"
-#include "Styling/AppStyle.h"
 #include "UObject/WeakObjectPtrTemplates.h"
-#include <TexturePresetAsset.h>
-#include "TexturePresetLibrary.h"
-#include "TexturePresetUserData.h"
-#include "Engine/AssetUserData.h"
-
-#if WITH_EDITOR
-#include "AssetRegistry/AssetRegistryModule.h"
-#include "Modules/ModuleManager.h"
-#include "Misc/MessageDialog.h"   // ? for confirmation dialog
-
-#include "AssetRegistry/AssetRegistryModule.h"
-#include "Modules/ModuleManager.h"
-#endif
 
 class IDetailsView;
 class UTexture2D;
-// Later you can swap this back to a real preset type:
-// class UTexturePresetAsset;
+class UTexturePresetAsset;
+struct FPropertyChangedEvent;
 
-// Simple enum for which tab on the left is active
+// Which "mode" the right side is in
 enum class ENavigationTab : uint8
 {
-    Files,
-    Presets
+	Files,
+	Presets
 };
 
 class SMyTwoColumnWidget : public SCompoundWidget
 {
 public:
+	SLATE_BEGIN_ARGS(SMyTwoColumnWidget) : _DetailsViewWidget(nullptr)
+		{}
+		// Optional: let the module pass in an existing details view
+		SLATE_ARGUMENT(TSharedPtr<IDetailsView>, DetailsViewWidget)
+	SLATE_END_ARGS()
 
-    SLATE_BEGIN_ARGS(SMyTwoColumnWidget)
-        : _DetailsViewWidget(nullptr)
-        {
-        }
-        SLATE_ARGUMENT(TSharedPtr<IDetailsView>, DetailsViewWidget)
-    SLATE_END_ARGS()
+	void Construct(const FArguments& InArgs);
+	virtual ~SMyTwoColumnWidget() override;
 
-    void Construct(const FArguments& InArgs)
-    {
-        DetailsView = InArgs._DetailsViewWidget;
-        ActiveTab = ENavigationTab::Files;
+	// For Ctrl+S
+	virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
 
-        ChildSlot
-            [
-                SNew(SSplitter)
-                    + SSplitter::Slot().Value(0.30f)[BuildLeftColumn()]
-                    + SSplitter::Slot().Value(0.70f)[BuildRightColumn()]
-            ];
+	// --- Public API used by Testing.cpp ---
+	// Add a newly imported texture to the "Files" list
+	void AddImportedTexture(UTexture2D* NewTexture);
 
-#if WITH_EDITOR
-        // Optional: gather existing textures under /Game
-        FAssetRegistryModule& AssetRegistryModule =
-            FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+	// Programmatically select a texture (as if the user clicked it)
+	void SetSelectedTexture(UTexture2D* NewTexture);
 
-        FARFilter Filter;
-        Filter.ClassPaths.Add(UTexture2D::StaticClass()->GetClassPathName());
-        Filter.bRecursiveClasses = true;
-        Filter.PackagePaths.Add(FName(TEXT("/Game")));
-        Filter.bRecursivePaths = true;
-
-        TArray<FAssetData> TextureAssets;
-        AssetRegistryModule.Get().GetAssets(Filter, TextureAssets);
-
-        for (const FAssetData& AssetData : TextureAssets)
-        {
-            if (UTexture2D* Tex = Cast<UTexture2D>(AssetData.GetAsset()))
-            {
-                TextureItems.Add(Tex);
-            }
-        }
-
-        if (TextureListView.IsValid())
-        {
-            TextureListView->RequestListRefresh();
-        }
-#endif
-
-        RefreshPresetOptions();
-    }
-
-
-    // Called by module when a texture is imported / discovered
-    void AddImportedTexture(UTexture2D* InTexture)
-    {
-        if (!InTexture)
-        {
-            return;
-        }
-
-        FTextureItem NewItem = InTexture;
-
-        // Avoid duplicates
-        if (!TextureItems.Contains(NewItem))
-        {
-            TextureItems.Add(NewItem);
-        }
-
-        // Refresh the list view
-        if (TextureListView.IsValid())
-        {
-            TextureListView->RequestListRefresh();
-
-            // Optional: auto-select the newly added texture
-            TextureListView->SetSelection(NewItem);
-        }
-    }
-
-    // Existing
-    void SetSelectedTexture(UTexture2D* InTexture)
-    {
-        SelectedTexture = InTexture;
-
-        if (DetailsView.IsValid())
-        {
-            DetailsView->SetObject(SelectedTexture.Get());
-        }
-
-        ActiveTab = ENavigationTab::Files;
-
-        // 1) Rebuild full preset list
-        RefreshPresetOptions();
-
-        // 2) Sync selection with the texture's assigned preset (if any)
-        RefreshPresetOptionsFromSelection();
-    }
-
+	// Ask the user for a preset name; returns false if user cancels
+	bool PromptForPresetName(const FString& DefaultName, FString& OutName, const FString& FixedPath);
 
 private:
+	// ---------- Types ----------
+	using FTextureItem = TWeakObjectPtr<UTexture2D>;
+	using FPresetItem = TWeakObjectPtr<UTexturePresetAsset>;
 
-    // ---------- Data ----------
+	// ---------- State ----------
 
-    ENavigationTab ActiveTab = ENavigationTab::Files;
+	ENavigationTab ActiveTab = ENavigationTab::Files;
 
-    // Right side details
-    TSharedPtr<IDetailsView> DetailsView;
+	// Right-side details view
+	TSharedPtr<IDetailsView> DetailsView;
 
-    // Files list
-    using FTextureItem = TWeakObjectPtr<UTexture2D>;
-    TArray<FTextureItem> TextureItems;
-    TSharedPtr< SListView<FTextureItem> > TextureListView;
+	// Files list (left column)
+	TArray<FTextureItem> TextureItems;
+	TSharedPtr<SListView<FTextureItem>> TextureListView;
 
-    // Presets list
-    // For now, use UObject* as the preset type; later replace with your UTexturePresetAsset
-    using FPresetItem = TWeakObjectPtr<UTexturePresetAsset>;
-    TArray<FPresetItem> PresetItems;
-    TSharedPtr< SListView<FPresetItem> > PresetListView;
+	// Presets list (right / Presets tab)
+	TArray<FPresetItem> PresetItems;
+	TSharedPtr<SListView<FPresetItem>> PresetListView;
 
-    // Current selection
-    FTextureItem SelectedTexture;
-    FPresetItem  SelectedPreset;
+	// Current selection
+	FTextureItem SelectedTexture;
+	FPresetItem  SelectedPreset;
 
-    // Preset dropdown
-    TArray<TSharedPtr<FString>> PresetOptions;
-    TSharedPtr<FString> CurrentPresetOption;
-    TSharedPtr<STextComboBox> PresetComboBox;
+	// Combo box options:
+	// Index 0 = <NONE>, nullptr preset
+	TArray<TWeakObjectPtr<UTexturePresetAsset>> PresetChoices;
+	TArray<TSharedPtr<FString>> PresetLabels;
+	TSharedPtr<FString> NonePresetOption;
+	TSharedPtr<FString> CurrentPresetOption;
+	TSharedPtr<STextComboBox> PresetComboBox;
 
-    // ---------- UI construction ----------
+	// Dirty flag when the selected texture's settings diverge from its preset
+	bool bPendingPresetChange = false;
 
-    TSharedRef<SWidget> BuildLeftColumn()
-    {
-        return
-            SNew(SBorder)
-            .Padding(4)
-            .BorderImage(FAppStyle::Get().GetBrush("ToolPanel.GroupBorder"))
-            [
-                SNew(SVerticalBox)
+	// For global property-change watching
+	FDelegateHandle PropertyChangedHandle;
 
-                    // Tabs: Files / Presets
-                    + SVerticalBox::Slot()
-                    .AutoHeight()
-                    .Padding(2)
-                    [
-                        SNew(SSegmentedControl<ENavigationTab>)
-                            .Value(this, &SMyTwoColumnWidget::GetActiveTab)
-                            .OnValueChanged(this, &SMyTwoColumnWidget::OnTabChanged)
-                            + SSegmentedControl<ENavigationTab>::Slot(ENavigationTab::Files)
-                            .Text(FText::FromString(TEXT("Files")))
-                            + SSegmentedControl<ENavigationTab>::Slot(ENavigationTab::Presets)
-                            .Text(FText::FromString(TEXT("Presets")))
-                    ]
+	// ---------- UI construction ----------
 
-                // Body (depending on tab)
-                + SVerticalBox::Slot()
-                    .FillHeight(1.f)
-                    .Padding(2)
-                    [
-                        SNew(SBox)
-                            [
-                                SNew(SWidgetSwitcher)
-                                    .WidgetIndex(this, &SMyTwoColumnWidget::GetWidgetIndex)
+	TSharedRef<SWidget> BuildLeftColumn();
+	TSharedRef<SWidget> BuildRightColumn();
+	TSharedRef<SWidget> BuildFilesList();
+	TSharedRef<SWidget> BuildPresetsList();
 
-                                    // Files List
-                                    + SWidgetSwitcher::Slot()
-                                    [
-                                        BuildFilesList()
-                                    ]
+	TSharedRef<ITableRow> GenerateTextureRow(FTextureItem Item, const TSharedRef<STableViewBase>& OwnerTable);
+	TSharedRef<ITableRow> GeneratePresetRow(FPresetItem Item, const TSharedRef<STableViewBase>& OwnerTable);
 
-                                    // Presets List
-                                    + SWidgetSwitcher::Slot()
-                                    [
-                                        BuildPresetsList()
-                                    ]
-                            ]
-                    ]
-            ];
-    }
+	// ---------- Tab / selection logic ----------
 
-    TSharedRef<SWidget> BuildFilesList()
-    {
-        // You’ll populate TextureItems from your manager / import events
-        TextureListView =
-            SNew(SListView<FTextureItem>)
-            .ListItemsSource(&TextureItems)
-            .OnGenerateRow(this, &SMyTwoColumnWidget::GenerateTextureRow)
-            .OnSelectionChanged(this, &SMyTwoColumnWidget::OnTextureSelected)
-            .SelectionMode(ESelectionMode::Multi);
+	ENavigationTab GetActiveTab() const;
+	void OnTabChanged(ENavigationTab NewTab);
 
-        return TextureListView.ToSharedRef();
-    }
+	void RefreshTextureList();
+	void RefreshPresetList();
 
-    TSharedRef<SWidget> BuildPresetsList()
-    {
-        // You’ll populate PresetItems from your preset manager
-        PresetListView =
-            SNew(SListView<FPresetItem>)
-            .ListItemsSource(&PresetItems)
-            .OnGenerateRow(this, &SMyTwoColumnWidget::GeneratePresetRow)
-            .OnSelectionChanged(this, &SMyTwoColumnWidget::OnPresetSelected)
-            .SelectionMode(ESelectionMode::Single);
+	void OnTextureSelected(FTextureItem Item, ESelectInfo::Type SelectInfo);
+	void OnPresetSelected(FPresetItem Item, ESelectInfo::Type SelectInfo);
 
-        return PresetListView.ToSharedRef();
-    }
+	void SyncSelectionToDetails();
+	void SelectPresetInCombo(UTexturePresetAsset* Preset);
+	void ShowPresetDetails(UTexturePresetAsset* Preset);
+	void ClearDetails();
 
-    TSharedRef<SWidget> BuildRightColumn()
-    {
-        return
-            SNew(SBorder)
-            .Padding(4)
-            .BorderImage(FAppStyle::Get().GetBrush("ToolPanel.GroupBorder"))
-            [
-                SNew(SVerticalBox)
+	// ---------- Combo + Save ----------
 
-                    // Header: preset dropdown + buttons
-                    + SVerticalBox::Slot()
-                    .AutoHeight()
-                    .Padding(0, 0, 0, 4)
-                    [
-                        BuildHeaderBar()
-                    ]
+	void OnPresetComboChanged(TSharedPtr<FString> NewSelection, ESelectInfo::Type SelectInfo);
+	FReply OnSaveButtonClicked();
 
-                    // Details View
-                    + SVerticalBox::Slot()
-                    .FillHeight(1.f)
-                    [
-                        DetailsView.IsValid()
-                            ? DetailsView.ToSharedRef()
-                            : SNullWidget::NullWidget
-                    ]
-            ];
-    }
+	// ---------- Change detection ----------
 
-    TSharedRef<SWidget> BuildHeaderBar()
-    {
-        return
-            SNew(SHorizontalBox)      
-
-            // Label
-            + SHorizontalBox::Slot()
-            .AutoWidth()
-            .VAlign(VAlign_Center)
-            .Padding(0, 0, 4, 0)
-            [
-                SNew(STextBlock)
-                    .Text(FText::FromString(TEXT("Current Preset:")))
-                    .IsEnabled(this, &SMyTwoColumnWidget::CanApplyPreset)
-                    .Visibility(this, &SMyTwoColumnWidget::IsFilesChosen)
-            ]
-
-            // Preset dropdown
-            + SHorizontalBox::Slot()
-            .AutoWidth()
-            [
-                SAssignNew(PresetComboBox, STextComboBox)
-                    .OptionsSource(&PresetOptions)
-                    .InitiallySelectedItem(CurrentPresetOption)
-                    .OnSelectionChanged(this, &SMyTwoColumnWidget::OnPresetComboChanged)
-                    .Visibility(this, &SMyTwoColumnWidget::IsFilesChosen)
-            ]
-
-            // Apply button
-            + SHorizontalBox::Slot()
-            .AutoWidth()
-            .Padding(4, 0)
-            [
-                SNew(SButton)
-                    .Text(FText::FromString(TEXT("Apply")))
-                    .OnClicked(this, &SMyTwoColumnWidget::OnApplyPresetClicked)           
-            ]
-
-            // Save button
-            + SHorizontalBox::Slot()
-            .AutoWidth()
-            .Padding(4, 0)
-            [
-                SNew(SButton)
-                    .Text(FText::FromString(TEXT("Save As Preset")))
-                    .OnClicked(this, &SMyTwoColumnWidget::OnSaveAsPresetClicked)
-                    .IsEnabled(this, &SMyTwoColumnWidget::CanSaveAsPreset)
-                    .Visibility(this, &SMyTwoColumnWidget::IsFilesChosen)
-            ]
-
-            // Spacer
-            + SHorizontalBox::Slot()
-            .FillWidth(1.f);
-    }
-
-    // ---------- Helpers / callbacks ----------
-
-    ENavigationTab GetActiveTab() const { return ActiveTab; }
-
-    EVisibility IsFilesChosen() const
-    {
-        return ActiveTab == ENavigationTab::Files ? EVisibility::Visible : EVisibility::Collapsed;
-    }
-
-    int32 GetWidgetIndex() const
-    {
-        return (ActiveTab == ENavigationTab::Files) ? 0 : 1;
-    }
-
-    void OnTabChanged(ENavigationTab NewTab)
-    {
-        ActiveTab = NewTab;
-
-        if (DetailsView.IsValid())
-        {
-            if (ActiveTab == ENavigationTab::Files && SelectedTexture.IsValid())
-            {
-                DetailsView->SetObject(SelectedTexture.Get());
-            }
-            else if (ActiveTab == ENavigationTab::Presets && SelectedPreset.IsValid())
-            {         
-                DetailsView->SetObject(SelectedPreset.Get());
-                PresetListView->SetSelection(SelectedPreset);
-            }
-        }
-
-        RefreshPresetOptions();
-        RefreshPresetOptionsFromSelection();
-    }
-
-    TSharedRef<ITableRow> GenerateTextureRow(
-        FTextureItem Item,
-        const TSharedRef<STableViewBase>& OwnerTable)
-    {
-        FText Label = FText::FromString(
-            Item.IsValid() ? Item->GetName() : TEXT("<invalid>"));
-
-        return
-            SNew(STableRow<FTextureItem>, OwnerTable)
-            [
-                SNew(STextBlock).Text(Label)
-            ];
-    }
-
-    void OnTextureSelected(FTextureItem Item, ESelectInfo::Type check)
-    {
-        SelectedTexture = Item;
-        ActiveTab = ENavigationTab::Files;
-
-        RefreshPresetOptions();
-        RefreshPresetOptionsFromSelection();
-
-        if (DetailsView.IsValid())
-        {
-            DetailsView->SetObject(SelectedTexture.Get());
-        }
-    }
-
-    TSharedRef<ITableRow> GeneratePresetRow(
-        FPresetItem Item,
-        const TSharedRef<STableViewBase>& OwnerTable)
-    {
-        FText Label = FText::FromString(TEXT("<Preset>"));
-
-        if (Item.IsValid())
-        {
-            const UTexturePresetAsset* Preset = Item.Get();
-            if (Preset)
-            {
-                if (!Preset->PresetName.IsNone())
-                {
-                    Label = FText::FromName(Preset->PresetName);
-                }
-                else
-                {
-                    Label = FText::FromString(Preset->GetName());
-                }
-            }
-        }
-
-        return
-            SNew(STableRow<FPresetItem>, OwnerTable)
-            [
-                SNew(STextBlock).Text(Label)
-            ];
-    }
-
-    void OnPresetSelected(FPresetItem Item, ESelectInfo::Type)
-    {
-        SelectedPreset = Item;
-        ActiveTab = ENavigationTab::Presets;
-
-        if (DetailsView.IsValid())
-        {        
-            DetailsView->SetObject(SelectedPreset.Get());
-        }
-
-        RefreshPresetOptions();
-    }
-
-    void RefreshPresetOptions()
-    {
-        PresetOptions.Empty();
-        PresetItems.Empty();
-        CurrentPresetOption.Reset();
-
-#if WITH_EDITOR
-        FAssetRegistryModule& AssetRegistryModule =
-            FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
-
-        FARFilter Filter;
-        Filter.ClassPaths.Add(UTexturePresetAsset::StaticClass()->GetClassPathName());
-        Filter.bRecursiveClasses = true;
-        Filter.PackagePaths.Add(FName(TEXT("/Game")));
-        Filter.bRecursivePaths = true;
-
-        TArray<FAssetData> PresetAssets;
-        AssetRegistryModule.Get().GetAssets(Filter, PresetAssets);
-
-        for (const auto& AssetData : PresetAssets)
-        {
-            UTexturePresetAsset* Preset = Cast<UTexturePresetAsset>(AssetData.GetAsset());
-            if (!Preset)
-            {
-                continue;
-            }
-
-            FPresetItem Item = Preset;
-            PresetItems.Add(Item);
-
-            const FString Label = !Preset->PresetName.IsNone()
-                ? Preset->PresetName.ToString()
-                : Preset->GetName();
-
-            PresetOptions.Add(MakeShared<FString>(Label));
-        }
-#endif
-
-        // Fallback if nothing found
-        if (PresetOptions.Num() == 0)
-        {
-            CurrentPresetOption = MakeShared<FString>(TEXT("Custom"));
-            PresetOptions.Add(CurrentPresetOption);
-        }
-        else
-        {
-            CurrentPresetOption = PresetOptions[0]; // temp default; can be overridden by selection sync
-        }
-
-        if (PresetComboBox.IsValid())
-        {
-            PresetComboBox->RefreshOptions();
-            PresetComboBox->SetSelectedItem(CurrentPresetOption);
-        }
-    }
-
-    void RefreshPresetOptionsFromSelection()
-    {
-#if WITH_EDITOR
-        if (!SelectedTexture.IsValid() || PresetOptions.Num() == 0)
-        {
-            // Nothing to sync
-            return;
-        }
-
-        UTexture2D* Texture = SelectedTexture.Get();
-        if (!Texture)
-        {
-            return;
-        }
-
-        UTexturePresetUserData* UserData =
-            Cast<UTexturePresetUserData>(Texture->GetAssetUserDataOfClass(
-                UTexturePresetUserData::StaticClass()));
-
-        if (!UserData || !UserData->AssignedPreset)
-        {
-            // No preset assigned, leave CurrentPresetOption as-is (or choose "Custom" if you added it)
-            return;
-        }
-
-        UTexturePresetAsset* Assigned = UserData->AssignedPreset;
-
-        // Find matching preset in PresetItems
-        int32 Index = PresetItems.IndexOfByPredicate(
-            [Assigned](const FPresetItem& Item)
-            {
-                return Item.IsValid() && Item.Get() == Assigned;
-            });
-
-        if (PresetItems.IsValidIndex(Index) && PresetOptions.IsValidIndex(Index))
-        {
-            CurrentPresetOption = PresetOptions[Index];
-
-            if (PresetComboBox.IsValid())
-            {
-                PresetComboBox->SetSelectedItem(CurrentPresetOption);
-            }
-        }
-#endif
-    }
-
-    void OnPresetComboChanged(TSharedPtr<FString> NewSelection, ESelectInfo::Type)
-    {
-        CurrentPresetOption = NewSelection;
-
-#if WITH_EDITOR
-        if (!NewSelection.IsValid())
-            return;
-
-        UTexturePresetAsset* FoundPreset =
-            TexturePresetLibrary::FindPresetByName(*NewSelection);
-
-        if (FoundPreset)
-        {
-            SelectedPreset = FoundPreset;
-
-            // Optional: if the Presets tab is active, show the preset asset in the details panel
-            if (DetailsView.IsValid())
-            {
-                if (ActiveTab == ENavigationTab::Files) {
-#if WITH_EDITOR
-                    if (!SelectedPreset.IsValid())
-                    {
-                        return;
-                    }
-
-                    // Collect selected textures from the list view
-                    TArray<FTextureItem> SelectedItems;
-
-                    if (TextureListView.IsValid())
-                    {
-                        TextureListView->GetSelectedItems(SelectedItems);
-                    }
-
-                    // Fallback: if nothing is explicitly selected in the list but we
-                    // still have SelectedTexture (e.g., set programmatically), use that.
-                    if (SelectedItems.Num() == 0 && SelectedTexture.IsValid())
-                    {
-                        SelectedItems.Add(SelectedTexture);
-                    }
-
-                    if (SelectedItems.Num() == 0)
-                    {
-                        // Nothing to apply to
-                        return;
-                    }
-
-                    // Apply preset to all selected textures
-                    for (const FTextureItem& Item : SelectedItems)
-                    {
-                        if (Item.IsValid())
-                        {
-                            UTexture2D* Texture = Item.Get();
-                            //TexturePresetLibrary::AssignPresetToTexture(SelectedPreset.Get(), Texture);
-                            TexturePresetLibrary::ApplyToTexture(SelectedPreset.Get(), Texture);
-                        }
-                    }
-#endif
-                }
-                else {
-                    //DetailsView->SetObject(FoundPreset);
-                }
-            }
-        }
-#endif
-    }
-
-    bool CanApplyPreset() const
-    {
-        // As long as we have a preset chosen, we can *try* to apply –
-        // we'll validate textures inside OnApplyPresetClicked.
-        return SelectedPreset.IsValid();
-    }
-
-    FReply OnApplyPresetClicked()
-    {
-#if WITH_EDITOR
-        if (!SelectedPreset.IsValid())
-        {
-            return FReply::Handled();
-        }
-
-        // Collect selected textures from the list view
-        TArray<FTextureItem> SelectedItems;
-
-        if (TextureListView.IsValid())
-        {
-            TextureListView->GetSelectedItems(SelectedItems);
-        }
-
-        // Fallback: if nothing is explicitly selected in the list but we
-        // still have SelectedTexture (e.g., set programmatically), use that.
-        if (SelectedItems.Num() == 0 && SelectedTexture.IsValid())
-        {
-            SelectedItems.Add(SelectedTexture);
-        }
-
-        if (SelectedItems.Num() == 0)
-        {
-            // Nothing to apply to
-            return FReply::Handled();
-        }
-
-        // If multiple, confirm with the user
-        if (SelectedItems.Num() > 1)
-        {
-            UTexturePresetAsset* Preset = SelectedPreset.Get();
-            const FString PresetLabel = Preset
-                ? (!Preset->PresetName.IsNone()
-                    ? Preset->PresetName.ToString()
-                    : Preset->GetName())
-                : TEXT("<Preset>");
-
-            const FString Msg = FString::Printf(
-                TEXT("Apply preset \"%s\" to %d textures?"),
-                *PresetLabel,
-                SelectedItems.Num());
-
-            const EAppReturnType::Type Result = FMessageDialog::Open(
-                EAppMsgType::YesNo,
-                FText::FromString(Msg));
-
-            if (Result != EAppReturnType::Yes)
-            {
-                return FReply::Handled();
-            }
-        }
-
-        // Apply preset to all selected textures
-        for (const FTextureItem& Item : SelectedItems)
-        {
-            if (Item.IsValid())
-            {
-                UTexture2D* Texture = Item.Get();
-                TexturePresetLibrary::AssignPresetToTexture(SelectedPreset.Get(), Texture);
-            }
-        }
-#endif
-
-        return FReply::Handled();
-    }
-
-    bool CanSaveAsPreset() const
-    {
-        return SelectedTexture.IsValid();
-    }
-
-    FReply OnSaveAsPresetClicked()
-    {
-#if WITH_EDITOR
-        if (!CanSaveAsPreset())
-        {
-            return FReply::Handled();
-        }
-
-        UTexture2D* Texture = SelectedTexture.Get();
-        if (!Texture)
-        {
-            return FReply::Handled();
-        }
-
-        // Name and path convention — tweak as you like
-        const FName PresetName(*FString::Printf(TEXT("%s_Preset"), *Texture->GetName()));
-        const FString PresetPath = TEXT("/Game/TexturePresets");
-
-        UTexturePresetAsset* NewPreset =
-            TexturePresetLibrary::CreatePresetAssetFromTexture(
-                Texture,
-                PresetPath,
-                PresetName);
-
-        if (NewPreset)
-        {
-            // Attach preset to this texture via user data
-            TexturePresetLibrary::AssignPresetToTexture(NewPreset, Texture);
-
-            // Track in our in-memory list for this session
-            FPresetItem NewItem = NewPreset;
-            PresetItems.Add(NewItem);
-
-            const FString Label = !NewPreset->PresetName.IsNone()
-                ? NewPreset->PresetName.ToString()
-                : NewPreset->GetName();
-
-            CurrentPresetOption = MakeShared<FString>(Label);
-            PresetOptions.Add(CurrentPresetOption);
-
-            if (PresetComboBox.IsValid())
-            {
-                PresetComboBox->RefreshOptions();
-                PresetComboBox->SetSelectedItem(CurrentPresetOption);
-            }
-
-            SelectedPreset = NewItem;
-        }
-#endif
-
-        return FReply::Handled();
-    }
+	void OnAnyPropertyChanged(UObject* Object, FPropertyChangedEvent& Event);
+	void InitializePropertyWatcher();
+	void ShutdownPropertyWatcher();
 };
