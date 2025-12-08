@@ -94,6 +94,18 @@ namespace TexturePresetLibrary
 		Texture->bForceMiplevelsToBeResident = In.bForceMiplevelsToBeResident;
 		//Texture->StreamingDistanceMultiplier = In.StreamingDistanceMultiplier;
 
+		Texture->AdjustBrightness = In.Brightness;
+		Texture->AdjustBrightnessCurve = In.BrightnessCurve;
+		Texture->AdjustVibrance = In.Vibrance;
+		Texture->AdjustSaturation = In.Saturation;
+		Texture->AdjustRGBCurve = In.RGBCurve;
+		Texture->AdjustHue = In.Hue;
+		Texture->AdjustMinAlpha = In.MinAlpha;
+		Texture->AdjustMaxAlpha = In.MaxAlpha;
+		Texture->bChromaKeyTexture = In.ChromaKeyTexture;
+		Texture->ChromaKeyThreshold = In.ChromaKeyThreshold;
+		Texture->ChromaKeyColor = In.ChromaKeyColor;
+
 		// --- Virtual texturing ---
 		Texture->VirtualTextureStreaming = In.VirtualTextureStreaming;
 
