@@ -720,7 +720,7 @@ void SMyTwoColumnWidget::OnPresetComboChanged(TSharedPtr<FString> NewSelection,E
 		Texture->MarkPackageDirty();
 
 		SelectedPreset = nullptr;
-		bPendingPresetChange = false;
+		bPendingPresetChange = true;
 
 		// Force the details panel to show the texture in its unassigned state
 		if (ActiveTab == ENavigationTab::Files && DetailsView.IsValid())
@@ -742,7 +742,7 @@ void SMyTwoColumnWidget::OnPresetComboChanged(TSharedPtr<FString> NewSelection,E
 #endif
 
 	SelectedPreset = NewPreset;
-	bPendingPresetChange = false;
+	bPendingPresetChange = true;
 
 	// Files tab: show the texture's *updated* values immediately
 	if (ActiveTab == ENavigationTab::Files && DetailsView.IsValid())
@@ -770,9 +770,28 @@ FReply SMyTwoColumnWidget::OnSaveButtonClicked()
 		return FReply::Handled();
 	}
 
+	// Collect selected textures from the list view
+	TArray<FTextureItem> SelectedItems;
+
+	if (TextureListView.IsValid())
+	{
+		TextureListView->GetSelectedItems(SelectedItems);
+	}
+
 	UTexture2D* Texture = SelectedTexture.Get();
 	if (!Texture)
 	{
+		return FReply::Handled();
+	}
+
+	if (SelectedItems.Num() == 0 && SelectedTexture.IsValid())
+	{
+		SelectedItems.Add(SelectedTexture);
+	}
+
+	if (SelectedItems.Num() == 0)
+	{
+		// Nothing to apply to
 		return FReply::Handled();
 	}
 
@@ -815,7 +834,42 @@ FReply SMyTwoColumnWidget::OnSaveButtonClicked()
 			// Also store the friendly display name
 			NewPreset->PresetName = AssetName;
 
-			TexturePresetLibrary::AssignPresetToTexture(NewPreset, Texture);
+			//TexturePresetLibrary::AssignPresetToTexture(NewPreset, Texture);
+			// If multiple, confirm with the user
+			if (SelectedItems.Num() > 1)
+			{
+				UTexturePresetAsset* Preset = SelectedPreset.Get();
+				const FString PresetLabel = Preset
+					? (!Preset->PresetName.IsNone()
+						? Preset->PresetName.ToString()
+						: Preset->GetName())
+					: TEXT("<Preset>");
+
+				const FString Msg = FString::Printf(
+					TEXT("Apply preset \"%s\" to %d textures?"),
+					*PresetLabel,
+					SelectedItems.Num());
+
+				const EAppReturnType::Type Result = FMessageDialog::Open(
+					EAppMsgType::YesNo,
+					FText::FromString(Msg));
+
+				if (Result != EAppReturnType::Yes)
+				{
+					return FReply::Handled();
+				}
+			}
+
+			// Apply preset to all selected textures
+			for (const FTextureItem& Item : SelectedItems)
+			{
+				if (Item.IsValid())
+				{
+					UTexture2D* NewTexture = Item.Get();
+					TexturePresetLibrary::AssignPresetToTexture(SelectedPreset.Get(), NewTexture);
+				}
+			}
+
 			SelectedPreset = NewPreset;
 		}
 
@@ -869,6 +923,41 @@ FReply SMyTwoColumnWidget::OnSaveButtonClicked()
 		}
 
 		SelectedPreset = CurrentPreset;
+
+		// If multiple, confirm with the user
+		if (SelectedItems.Num() > 1)
+		{
+			UTexturePresetAsset* Preset = SelectedPreset.Get();
+			const FString PresetLabel = Preset
+				? (!Preset->PresetName.IsNone()
+					? Preset->PresetName.ToString()
+					: Preset->GetName())
+				: TEXT("<Preset>");
+
+			const FString Msg = FString::Printf(
+				TEXT("Apply preset \"%s\" to %d textures?"),
+				*PresetLabel,
+				SelectedItems.Num());
+
+			const EAppReturnType::Type Result = FMessageDialog::Open(
+				EAppMsgType::YesNo,
+				FText::FromString(Msg));
+
+			if (Result != EAppReturnType::Yes)
+			{
+				return FReply::Handled();
+			}
+		}
+
+		// Apply preset to all selected textures
+		for (const FTextureItem& Item : SelectedItems)
+		{
+			if (Item.IsValid())
+			{
+				UTexture2D* NewTexture = Item.Get();
+				TexturePresetLibrary::AssignPresetToTexture(SelectedPreset.Get(), NewTexture);
+			}
+		}
 	}
 	else if (Response == EAppReturnType::No)
 	{
@@ -889,7 +978,41 @@ FReply SMyTwoColumnWidget::OnSaveButtonClicked()
 		{
 			NewPreset->PresetName = AssetName;
 
-			TexturePresetLibrary::AssignPresetToTexture(NewPreset, Texture);
+			// If multiple, confirm with the user
+			if (SelectedItems.Num() > 1)
+			{
+				UTexturePresetAsset* Preset = SelectedPreset.Get();
+				const FString PresetLabel = Preset
+					? (!Preset->PresetName.IsNone()
+						? Preset->PresetName.ToString()
+						: Preset->GetName())
+					: TEXT("<Preset>");
+
+				const FString Msg = FString::Printf(
+					TEXT("Apply preset \"%s\" to %d textures?"),
+					*PresetLabel,
+					SelectedItems.Num());
+
+				const EAppReturnType::Type Result = FMessageDialog::Open(
+					EAppMsgType::YesNo,
+					FText::FromString(Msg));
+
+				if (Result != EAppReturnType::Yes)
+				{
+					return FReply::Handled();
+				}
+			}
+
+			// Apply preset to all selected textures
+			for (const FTextureItem& Item : SelectedItems)
+			{
+				if (Item.IsValid())
+				{
+					UTexture2D* NewTexture = Item.Get();
+					TexturePresetLibrary::AssignPresetToTexture(SelectedPreset.Get(), NewTexture);
+				}
+			}
+
 			SelectedPreset = NewPreset;
 		}
 	}
