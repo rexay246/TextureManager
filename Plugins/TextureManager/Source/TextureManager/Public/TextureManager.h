@@ -7,7 +7,7 @@
 #include "Editor.h"
 #include <SMyTwoColumnWidget.h>
 
-class FTestingModule : public IModuleInterface
+class FTextureManagerModule : public IModuleInterface
 {
 public:
 

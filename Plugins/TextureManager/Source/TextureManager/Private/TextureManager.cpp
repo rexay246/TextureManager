@@ -1,14 +1,14 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "Testing.h"
+#include "TextureManager.h"
 #include "PropertyEditorModule.h"
 #include "IDetailsView.h"
 #include "SMyTwoColumnWidget.h"
 #include "Widgets/Docking/SDockTab.h"
 
-#define LOCTEXT_NAMESPACE "FTestingModule"
+#define LOCTEXT_NAMESPACE "FTextureManagerModule"
 
-void FTestingModule::StartupModule()
+void FTextureManagerModule::StartupModule()
 {
     // Load the Importing
     {
@@ -29,7 +29,7 @@ void FTestingModule::StartupModule()
         }
 
         ImportSubsystem->OnAssetPostImport.AddRaw(
-            this, &FTestingModule::OnAssetImported
+            this, &FTextureManagerModule::OnAssetImported
         );
 
         UE_LOG(LogTemp, Warning, TEXT("Delegate bound successfully"));
@@ -39,14 +39,14 @@ void FTestingModule::StartupModule()
     //SomeObjectToEdit = NewObject<UObject>(GetTransientPackage(), UObject::StaticClass());
 
     FGlobalTabmanager::Get()->RegisterNomadTabSpawner("TextureManager",
-        FOnSpawnTab::CreateRaw(this, &FTestingModule::OnSpawnPluginTab))
+        FOnSpawnTab::CreateRaw(this, &FTextureManagerModule::OnSpawnPluginTab))
        .SetMenuType(ETabSpawnerMenuType::Hidden)
        .SetDisplayName(FText::FromString("Texture Manager"));
 
-    UToolMenus::RegisterStartupCallback(FSimpleMulticastDelegate::FDelegate::CreateRaw(this, &FTestingModule::RegisterMenus));
+    UToolMenus::RegisterStartupCallback(FSimpleMulticastDelegate::FDelegate::CreateRaw(this, &FTextureManagerModule::RegisterMenus));
 }
 
-void FTestingModule::OnAssetImported(UFactory* Factory, UObject* Imported)
+void FTextureManagerModule::OnAssetImported(UFactory* Factory, UObject* Imported)
 {
     UE_LOG(LogTemp, Warning, TEXT("IMPORT FIRED for %s"),
         Imported ? *Imported->GetName() : TEXT("<null>"));
@@ -89,7 +89,7 @@ void FTestingModule::OnAssetImported(UFactory* Factory, UObject* Imported)
     }
 }
 
-TSharedRef<SDockTab> FTestingModule::OnSpawnPluginTab(const FSpawnTabArgs& Args)
+TSharedRef<SDockTab> FTextureManagerModule::OnSpawnPluginTab(const FSpawnTabArgs& Args)
 {
     // 1. Load Property Editor module
     FPropertyEditorModule& PropEditorModule =
@@ -128,7 +128,7 @@ TSharedRef<SDockTab> FTestingModule::OnSpawnPluginTab(const FSpawnTabArgs& Args)
         ];
 }
 
-void FTestingModule::RegisterMenus()
+void FTextureManagerModule::RegisterMenus()
 {
     UToolMenu* Menu = UToolMenus::Get()->ExtendMenu("LevelEditor.MainMenu.Window");
 
@@ -146,7 +146,7 @@ void FTestingModule::RegisterMenus()
     );
 }
 
-void FTestingModule::ShutdownModule()
+void FTextureManagerModule::ShutdownModule()
 {
 	// This function may be called during shutdown to clean up your module.  For modules that support dynamic reloading,
 	// we call this function before unloading the module.
@@ -155,4 +155,4 @@ void FTestingModule::ShutdownModule()
 
 #undef LOCTEXT_NAMESPACE
 	
-IMPLEMENT_MODULE(FTestingModule, Testing)
+IMPLEMENT_MODULE(FTextureManagerModule, TextureManager)

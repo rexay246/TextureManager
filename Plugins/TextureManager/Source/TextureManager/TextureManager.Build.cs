@@ -3,9 +3,9 @@
 using System.IO;
 using UnrealBuildTool;
 
-public class Testing : ModuleRules
+public class TextureManager : ModuleRules
 {
-	public Testing(ReadOnlyTargetRules Target) : base(Target)
+	public TextureManager(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 		
