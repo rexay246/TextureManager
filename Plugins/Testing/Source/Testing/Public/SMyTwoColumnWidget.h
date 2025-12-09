@@ -73,6 +73,9 @@ private:
 	FTextureItem SelectedTexture;
 	FPresetItem  SelectedPreset;
 
+	UTexture2D* PreviewTexture = nullptr;
+	UTexturePresetAsset* PreviewPreset = nullptr;
+
 	// Combo box options:
 	// Index 0 = <NONE>, nullptr preset
 	TArray<TWeakObjectPtr<UTexturePresetAsset>> PresetChoices;
@@ -95,6 +98,7 @@ private:
 
 	// Dirty flag when the selected texture's settings diverge from its preset
 	bool bPendingPresetChange = false;
+	bool bPendingPropertyChange = false;
 
 	// For global property-change watching
 	FDelegateHandle PropertyChangedHandle;
@@ -129,6 +133,7 @@ private:
 
 	void OnPresetComboChanged(TSharedPtr<FString> NewSelection, ESelectInfo::Type SelectInfo);
 	FReply OnSaveButtonClicked();
+	FReply OnPresetSaveButtonClicked();
 
 	// ---------- Change detection ----------
 
@@ -140,6 +145,8 @@ private:
 	void OnFilesSearchChanged(const FText& InText);
 	void OnPresetsSearchChanged(const FText& InText);
 
+	void SaveFiles(TArray<FTextureItem> SelectedItems);
+
 	EVisibility IsFilesChosen() const
 	{
 		return ActiveTab == ENavigationTab::Files ? EVisibility::Visible : EVisibility::Collapsed;
@@ -149,4 +156,7 @@ private:
 	{
 		return ActiveTab == ENavigationTab::Files;
 	}
+
+	UTexture2D* CloneTextureTransient(UTexture2D* Source);
+	void OnDetailsPropertyChanged(const FPropertyChangedEvent& Event);
 };

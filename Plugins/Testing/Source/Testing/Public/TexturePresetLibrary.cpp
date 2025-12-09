@@ -54,14 +54,13 @@ namespace TexturePresetLibrary
 		// Add more fields here if you decide to extend the struct later.
 	}
 
-
 	void ApplyToTexture(UTexturePresetAsset* PresetAsset, UTexture2D* Texture)
 	{
 		if (!PresetAsset || !Texture) return;
 
 		const FTexturePresetSettings& In = PresetAsset->Settings;
 
-		Texture->Modify();
+		//Texture->Modify();
 
 		// --- Core ---
 		Texture->LODGroup = In.TextureGroup;
@@ -109,8 +108,8 @@ namespace TexturePresetLibrary
 		// --- Virtual texturing ---
 		Texture->VirtualTextureStreaming = In.VirtualTextureStreaming;
 
-		Texture->PostEditChange();
-		Texture->MarkPackageDirty();
+		//Texture->PostEditChange();
+		//Texture->MarkPackageDirty();
 	}
 
 
@@ -184,7 +183,7 @@ namespace TexturePresetLibrary
 			return;
 		}
 
-		Texture->Modify();
+		//Texture->Modify();
 
 		UTexturePresetUserData* UserData = Cast<UTexturePresetUserData>(
 			Texture->GetAssetUserDataOfClass(UTexturePresetUserData::StaticClass()));
@@ -197,13 +196,16 @@ namespace TexturePresetLibrary
 			Texture->AddAssetUserData(UserData);
 		}
 
-		if (UserData->AssignedPreset && UserData->AssignedPreset->Files.Find(Texture) != INDEX_NONE)
+		if (UserData->AssignedPreset && UserData->AssignedPreset->Files.Find(Texture) != INDEX_NONE) {
 			UserData->AssignedPreset->Files.Remove(Texture);
+			UserData->AssignedPreset->MarkPackageDirty();
+		}
 		UserData->AssignedPreset = PresetAsset;
 		UserData->AssignedPreset->Files.Add(Texture);
+		UserData->AssignedPreset->MarkPackageDirty();
 
-		Texture->MarkPackageDirty();
-		Texture->PostEditChange();
+		//Texture->MarkPackageDirty();
+		//Texture->PostEditChange();
 #endif
 	}
 
@@ -318,5 +320,44 @@ namespace TexturePresetLibrary
 		PresetAsset->Files = LinkedTextures;
 		PresetAsset->MarkPackageDirty();
 #endif
+	}
+
+	void CopyProperties(UTexturePresetAsset* AssetIn, UTexturePresetAsset* AssetOut)
+	{
+		FTexturePresetSettings& In = AssetIn->Settings;
+		FTexturePresetSettings& Out = AssetOut->Settings;
+
+		// --- Core ---
+		Out.TextureGroup = In.TextureGroup;
+		Out.LODBias = In.LODBias;
+		Out.CompressionSettings = In.CompressionSettings;
+		//Out.CompressionQuality = Texture->CompressionQuality;
+		Out.bSRGB = In.bSRGB;
+
+		Out.bUseAlpha = In.bUseAlpha; // informational
+		Out.bFlipGreenChannel = In.bFlipGreenChannel;
+
+		// --- Filter / addressing ---
+		Out.Filter = In.Filter;
+		Out.XTilingMethod = In.XTilingMethod;
+		Out.YTilingMethod = In.YTilingMethod;
+		//Out.AddressZ = Texture->AddressZ;
+		//Out.MaxAnisotropy = Texture->MaxAnisotropy;
+
+		// --- Mips / size ---
+		Out.MipGenSettings = In.MipGenSettings;
+		Out.MaxTextureSize = In.MaxTextureSize;
+		Out.NumCinematicMipLevels = In.NumCinematicMipLevels;
+		Out.bPreserveBorder = In.bPreserveBorder;
+		//Out.DownscaleFactor = Texture->DownscaleFactor;
+		//Out.DownscaleOptions = Texture->DownscaleOptions;
+
+		// --- Streaming / residency ---
+		Out.NeverStream = In.NeverStream;
+		Out.bForceMiplevelsToBeResident = In.bForceMiplevelsToBeResident;
+		//Out.StreamingDistanceMultiplier = Texture->StreamingDistanceMultiplier;
+
+		// --- Virtual texturing ---
+		Out.VirtualTextureStreaming = In.VirtualTextureStreaming;
 	}
 }
