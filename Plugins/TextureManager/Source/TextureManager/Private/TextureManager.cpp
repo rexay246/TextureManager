@@ -5,6 +5,7 @@
 #include "IDetailsView.h"
 #include "SMyTwoColumnWidget.h"
 #include "Widgets/Docking/SDockTab.h"
+#include "TexturePresetLibrary.h"
 
 #define LOCTEXT_NAMESPACE "FTextureManagerModule"
 
@@ -35,8 +36,8 @@ void FTextureManagerModule::StartupModule()
         UE_LOG(LogTemp, Warning, TEXT("Delegate bound successfully"));
     }
 
-    // Editor Tab
-    //SomeObjectToEdit = NewObject<UObject>(GetTransientPackage(), UObject::StaticClass());
+    FEditorDelegates::OnAssetsPreDelete.AddRaw(
+        this, &FTextureManagerModule::OnAssetsPreDelete);
 
     FGlobalTabmanager::Get()->RegisterNomadTabSpawner("TextureManager",
         FOnSpawnTab::CreateRaw(this, &FTextureManagerModule::OnSpawnPluginTab))
@@ -152,6 +153,26 @@ void FTextureManagerModule::ShutdownModule()
 	// This function may be called during shutdown to clean up your module.  For modules that support dynamic reloading,
 	// we call this function before unloading the module.
     FGlobalTabmanager::Get()->UnregisterNomadTabSpawner("TextureManager");
+    FEditorDelegates::OnAssetsPreDelete.RemoveAll(this);
+}
+
+void FTextureManagerModule::OnAssetsPreDelete(const TArray<UObject*>& Assets)
+{
+    for (UObject* Obj : Assets)
+    {
+        UTexture2D* Texture = Cast<UTexture2D>(Obj);
+        if (!Texture) continue;
+
+        // Remove from preset files list
+        TexturePresetLibrary::RemovePresetFromTexture(Texture);
+
+        // Update UI
+        if (ManagerWidget.IsValid())
+        {
+            ManagerWidget->RefreshPresetList();
+            ManagerWidget->RefreshTextureList();
+        }
+    }
 }
 
 #undef LOCTEXT_NAMESPACE

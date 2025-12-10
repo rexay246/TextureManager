@@ -8,6 +8,7 @@
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Modules/ModuleManager.h"
 #include "UObject/Package.h"
+#include "FileHelpers.h" 
 #endif
 
 namespace TexturePresetLibrary
@@ -433,5 +434,54 @@ namespace TexturePresetLibrary
 
 		// --- Virtual texturing ---
 		Out.VirtualTextureStreaming = In.VirtualTextureStreaming;
+	}
+
+	void RemovePresetFromTexture(UTexture2D* Texture)
+	{
+#if WITH_EDITOR
+		if (!Texture)
+		{
+			return;
+		}
+		TArray<UPackage*> PackagesToSave;
+
+		// Find user data that stores the AssignedPreset pointer
+		UTexturePresetUserData* UserData = Cast<UTexturePresetUserData>(
+			Texture->GetAssetUserDataOfClass(UTexturePresetUserData::StaticClass()));
+
+		if (!UserData)
+		{
+			return;
+		}
+
+		UTexturePresetAsset* Preset = UserData->AssignedPreset;
+		if (Preset)
+		{
+			// Remove this texture from the preset's Files list
+			Preset->Modify();
+			Preset->Files.Remove(Texture);
+			Preset->MarkPackageDirty();
+			if (UPackage* Package = Preset->GetOutermost())
+			{
+				if (Package->IsDirty())
+				{
+					PackagesToSave.AddUnique(Package);
+				}
+			}
+		}
+
+		// Clear the link on the texture side (not strictly necessary for delete,
+		// but keeps things tidy if this helper is used elsewhere)
+		Texture->Modify();
+		UserData->AssignedPreset = nullptr;
+		Texture->RemoveUserDataOfClass(UTexturePresetUserData::StaticClass());
+		Texture->MarkPackageDirty();
+		// Save without another "Do you want to save?" prompt – pressing our Save
+// button is already the explicit intent to save these assets.
+		FEditorFileUtils::PromptForCheckoutAndSave(
+			PackagesToSave,
+			/*bCheckDirty=*/false,
+			/*bPromptToSave=*/false);
+#endif
 	}
 }

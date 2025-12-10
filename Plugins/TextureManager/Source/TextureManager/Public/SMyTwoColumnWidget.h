@@ -54,6 +54,9 @@ public:
 	// Ask the user for a preset name; returns false if user cancels
 	bool PromptForPresetName(const FString& DefaultName, FString& OutName, const FString& FixedPath);
 
+	void RefreshPresetList();
+	void RefreshTextureList();
+
 private:
 	// ---------- Types ----------
 	using FTextureItem = TWeakObjectPtr<UTexture2D>;
@@ -127,9 +130,6 @@ private:
 	ENavigationTab GetActiveTab() const;
 	void OnTabChanged(ENavigationTab NewTab);
 
-	void RefreshTextureList();
-	void RefreshPresetList();
-
 	void OnTextureSelected(FTextureItem Item, ESelectInfo::Type SelectInfo);
 	void OnPresetSelected(FPresetItem Item, ESelectInfo::Type SelectInfo);
 
@@ -169,4 +169,6 @@ private:
 
 	UTexture2D* CloneTextureTransient(UTexture2D* Source);
 	void OnDetailsPropertyChanged(const FPropertyChangedEvent& Event);
+
+	void SaveDirtyTexturesAndPresets();
 };

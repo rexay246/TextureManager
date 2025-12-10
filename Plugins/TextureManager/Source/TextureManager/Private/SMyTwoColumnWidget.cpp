@@ -31,6 +31,9 @@
 
 #include "Engine/Engine.h"
 
+#include "Interfaces/IPluginManager.h"
+#include "FileHelpers.h" 
+
 // ---------- Helper ------------------------
 
 UTexture2D* SMyTwoColumnWidget::CloneTextureTransient(UTexture2D* Source)
@@ -149,7 +152,7 @@ TSharedRef<SWidget> SMyTwoColumnWidget::BuildLeftColumn()
 						.Value(this, &SMyTwoColumnWidget::GetActiveTab)
 						.OnValueChanged(this, &SMyTwoColumnWidget::OnTabChanged)
 						+ SSegmentedControl<ENavigationTab>::Slot(ENavigationTab::Files)
-						.Text(NSLOCTEXT("TextureManager", "FilesTab", "Files"))
+						.Text(NSLOCTEXT("TextureManager", "FilesTab", "Textures"))
 						+ SSegmentedControl<ENavigationTab>::Slot(ENavigationTab::Presets)
 						.Text(NSLOCTEXT("TextureManager", "PresetsTab", "Presets"))
 				]
@@ -390,9 +393,13 @@ void SMyTwoColumnWidget::OnTabChanged(ENavigationTab NewTab)
 	if (ActiveTab == ENavigationTab::Files) {
 		if (SelectedPreset.Get()) {
 			auto Preset = SelectedPreset.Get();
-			for (auto Texture : Preset->Files) {
-				TexturePresetLibrary::ApplyToTexture(Preset, Texture);
-				Texture->PostEditChange();
+			if (Preset) {
+				for (auto Texture : Preset->Files) {
+					if (Texture) {
+						TexturePresetLibrary::ApplyToTexture(Preset, Texture);
+						Texture->PostEditChange();
+					}
+				}
 			}
 		}
 	}
@@ -403,9 +410,13 @@ void SMyTwoColumnWidget::OnTabChanged(ENavigationTab NewTab)
 				Cast<UTexturePresetUserData>(
 					PTexture->GetAssetUserDataOfClass(UTexturePresetUserData::StaticClass()));
 			UTexturePresetAsset* Preset = UserData ? UserData->AssignedPreset : nullptr;
-			for (auto Texture : Preset->Files) {
-				TexturePresetLibrary::ApplyToTexture(Preset, Texture);
-				Texture->PostEditChange();
+			if (Preset) {
+				for (auto Texture : Preset->Files) {
+					if (Texture) {
+						TexturePresetLibrary::ApplyToTexture(Preset, Texture);
+						Texture->PostEditChange();
+					}
+				}
 			}
 		}
 	}
@@ -419,6 +430,38 @@ void SMyTwoColumnWidget::OnTabChanged(ENavigationTab NewTab)
 
 void SMyTwoColumnWidget::RefreshTextureList()
 {
+//	//TextureItems.Reset();
+//	AllTextureItems.Reset();
+//	FilteredTextureItems.Reset();
+//
+//#if WITH_EDITOR
+//	FAssetRegistryModule& AssetRegistryModule =
+//		FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+//
+//	FARFilter Filter;
+//	Filter.ClassPaths.Add(UTexture2D::StaticClass()->GetClassPathName());
+//	Filter.bRecursivePaths = true;
+//	Filter.PackagePaths.Add(FName(TEXT("/Game")));
+//
+//	TArray<FAssetData> Assets;
+//	AssetRegistryModule.Get().GetAssets(Filter, Assets);
+//
+//	for (const FAssetData& Data : Assets)
+//	{
+//		if (UTexture2D* Texture = Cast<UTexture2D>(Data.GetAsset()))
+//		{
+//			//TextureItems.Add(Texture);
+//			AllTextureItems.Add(Texture);
+//			FilteredTextureItems.Add(Texture);
+//		}
+//	}
+//#endif
+//
+//	if (TextureListView.IsValid())
+//	{
+//		TextureListView->RequestListRefresh();
+//	}
+
 	//TextureItems.Reset();
 	AllTextureItems.Reset();
 	FilteredTextureItems.Reset();
@@ -426,25 +469,40 @@ void SMyTwoColumnWidget::RefreshTextureList()
 #if WITH_EDITOR
 	FAssetRegistryModule& AssetRegistryModule =
 		FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+	IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
 
 	FARFilter Filter;
 	Filter.ClassPaths.Add(UTexture2D::StaticClass()->GetClassPathName());
 	Filter.bRecursivePaths = true;
+	Filter.bRecursiveClasses = true;
+
+	// 1) Project Content (/Game)
 	Filter.PackagePaths.Add(FName(TEXT("/Game")));
 
+	// 2) Plugin Content
+	if (TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(TEXT("TextureManager")))
+	{
+		const FString PluginRoot = Plugin->GetMountedAssetPath(); // e.g. "/TextureManager"
+		if (!PluginRoot.IsEmpty())
+		{
+			Filter.PackagePaths.Add(FName(*PluginRoot));
+		}
+	}
+
 	TArray<FAssetData> Assets;
-	AssetRegistryModule.Get().GetAssets(Filter, Assets);
+	AssetRegistry.GetAssets(Filter, Assets);
 
 	for (const FAssetData& Data : Assets)
 	{
 		if (UTexture2D* Texture = Cast<UTexture2D>(Data.GetAsset()))
 		{
-			//TextureItems.Add(Texture);
-			AllTextureItems.Add(Texture);
-			FilteredTextureItems.Add(Texture);
+			FTextureItem Item = Texture;
+			//TextureItems.Add(Item);
+			AllTextureItems.Add(Item);
+			FilteredTextureItems.Add(Item);
 		}
 	}
-#endif
+#endif // WITH_EDITOR
 
 	if (TextureListView.IsValid())
 	{
@@ -454,7 +512,74 @@ void SMyTwoColumnWidget::RefreshTextureList()
 
 void SMyTwoColumnWidget::RefreshPresetList()
 {
-	//PresetItems.Reset();
+//	//PresetItems.Reset();
+//	AllPresetItems.Reset();
+//	FilteredPresetItems.Reset();
+//
+//	PresetChoices.Reset();
+//	PresetLabels.Reset();
+//
+//	FilterPresetLabels.Reset();
+//	FilterPresetChoices.Reset();
+//
+//	// Index 0 = <NONE>
+//	NonePresetOption = MakeShared<FString>(TEXT("<NONE>"));
+//	PresetLabels.Add(NonePresetOption);
+//	PresetChoices.Add(nullptr);
+//
+//	AllPresetOption = MakeShared<FString>(TEXT("All"));
+//	FilterPresetLabels.Add(AllPresetOption);
+//	FilterPresetLabels.Add(NonePresetOption);
+//	FilterPresetChoices.Add(nullptr);
+//	FilterPresetChoices.Add(nullptr);
+//
+//#if WITH_EDITOR
+//	FAssetRegistryModule& AssetRegistryModule =
+//		FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+//
+//	FARFilter Filter;
+//	Filter.ClassPaths.Add(UTexturePresetAsset::StaticClass()->GetClassPathName());
+//	Filter.bRecursivePaths = true;
+//	Filter.PackagePaths.Add(FName(TEXT("/Game")));
+//
+//	TArray<FAssetData> Assets;
+//	AssetRegistryModule.Get().GetAssets(Filter, Assets);
+//
+//	for (const FAssetData& Data : Assets)
+//	{
+//		if (UTexturePresetAsset* Preset = Cast<UTexturePresetAsset>(Data.GetAsset()))
+//		{
+//			//PresetItems.Add(Preset);      // for list view
+//			AllPresetItems.Add(Preset);
+//			FilteredPresetItems.Add(Preset);
+//			PresetChoices.Add(Preset);    // for combo
+//			FilterPresetChoices.Add(Preset);
+//			const FString Label =
+//				!Preset->PresetName.IsNone()
+//				? Preset->PresetName.ToString()
+//				: Preset->GetName();
+//
+//			PresetLabels.Add(MakeShared<FString>(Label));
+//			FilterPresetLabels.Add(MakeShared<FString>(Label));
+//		}
+//	}
+//#endif
+//
+//	if (PresetComboBox.IsValid())
+//	{
+//		PresetComboBox->RefreshOptions();
+//	}
+//
+//	if (PresetListView.IsValid())
+//	{
+//		PresetListView->RequestListRefresh();
+//	}
+//
+//	// Re-select current preset in combo if any
+//	SelectPresetInCombo(SelectedPreset.Get());
+//	CurrentFilterOption = FilterPresetLabels[FilterIndex];
+
+		//PresetItems.Reset();
 	AllPresetItems.Reset();
 	FilteredPresetItems.Reset();
 
@@ -469,43 +594,72 @@ void SMyTwoColumnWidget::RefreshPresetList()
 	PresetLabels.Add(NonePresetOption);
 	PresetChoices.Add(nullptr);
 
-	AllPresetOption = MakeShared<FString>(TEXT("All"));
-	FilterPresetLabels.Add(AllPresetOption);
 	FilterPresetLabels.Add(NonePresetOption);
-	FilterPresetChoices.Add(nullptr);
 	FilterPresetChoices.Add(nullptr);
 
 #if WITH_EDITOR
 	FAssetRegistryModule& AssetRegistryModule =
 		FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+	IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
 
 	FARFilter Filter;
 	Filter.ClassPaths.Add(UTexturePresetAsset::StaticClass()->GetClassPathName());
 	Filter.bRecursivePaths = true;
+	Filter.bRecursiveClasses = true;
+
+	// 1) Project Content (/Game)
 	Filter.PackagePaths.Add(FName(TEXT("/Game")));
 
+	// 2) Plugin Content (e.g. /Testing)
+	if (TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(TEXT("TextureManager")))
+	{
+		const FString PluginRoot = Plugin->GetMountedAssetPath(); // e.g. "/Testing"
+		if (!PluginRoot.IsEmpty())
+		{
+			Filter.PackagePaths.Add(FName(*PluginRoot));
+		}
+	}
+
 	TArray<FAssetData> Assets;
-	AssetRegistryModule.Get().GetAssets(Filter, Assets);
+	AssetRegistry.GetAssets(Filter, Assets);
 
 	for (const FAssetData& Data : Assets)
 	{
 		if (UTexturePresetAsset* Preset = Cast<UTexturePresetAsset>(Data.GetAsset()))
 		{
-			//PresetItems.Add(Preset);      // for list view
-			AllPresetItems.Add(Preset);
-			FilteredPresetItems.Add(Preset);
-			PresetChoices.Add(Preset);    // for combo
-			FilterPresetChoices.Add(Preset);
-			const FString Label =
-				!Preset->PresetName.IsNone()
+			FPresetItem Item = Preset;
+
+			// For list view
+			AllPresetItems.Add(Item);
+			FilteredPresetItems.Add(Item);
+
+			// For combo boxes
+			const FString LabelString = !Preset->PresetName.IsNone()
 				? Preset->PresetName.ToString()
 				: Preset->GetName();
 
-			PresetLabels.Add(MakeShared<FString>(Label));
-			FilterPresetLabels.Add(MakeShared<FString>(Label));
+			TSharedPtr<FString> Label = MakeShared<FString>(LabelString);
+
+			PresetLabels.Add(Label);
+			PresetChoices.Add(Preset);
+
+			FilterPresetLabels.Add(Label);
+			FilterPresetChoices.Add(Preset);
 		}
 	}
-#endif
+#endif // WITH_EDITOR
+
+	//for (auto Preset : AllPresetItems)
+	//{
+	//	if (!Preset.Get()) continue;
+	//	Preset.Get()->Modify();
+	//	Preset.Get()->Files.RemoveAll([](UTexture2D* Tex)
+	//		{
+	//			return Tex == nullptr || !IsValid(Tex);
+	//		});
+	//	Preset.Get()->MarkPackageDirty();
+	//}
+	//SaveDirtyTexturesAndPresets();
 
 	if (PresetComboBox.IsValid())
 	{
@@ -517,9 +671,8 @@ void SMyTwoColumnWidget::RefreshPresetList()
 		PresetListView->RequestListRefresh();
 	}
 
-	// Re-select current preset in combo if any
+	// Re-select current preset in the combo box, if any
 	SelectPresetInCombo(SelectedPreset.Get());
-	CurrentFilterOption = FilterPresetLabels[FilterIndex];
 }
 
 bool SMyTwoColumnWidget::PromptForPresetName(const FString& DefaultName, FString& OutName, const FString& FixedPath)
@@ -646,9 +799,13 @@ void SMyTwoColumnWidget::OnTextureSelected(FTextureItem Item, ESelectInfo::Type 
 			Cast<UTexturePresetUserData>(
 				PTexture->GetAssetUserDataOfClass(UTexturePresetUserData::StaticClass()));
 		UTexturePresetAsset* Preset = UserData ? UserData->AssignedPreset : nullptr;
-		for (auto Texture : Preset->Files) {
-			TexturePresetLibrary::ApplyToTexture(Preset, Texture);
-			Texture->PostEditChange();
+		if (Preset) {
+			for (auto Texture : Preset->Files) {
+				if (Texture) {
+					TexturePresetLibrary::ApplyToTexture(Preset, Texture);
+					Texture->PostEditChange();
+				}
+			}
 		}
 	}
 
@@ -706,9 +863,13 @@ void SMyTwoColumnWidget::OnPresetSelected(FPresetItem Item, ESelectInfo::Type Se
 {
 	if (SelectedPreset.Get()) {
 		auto Preset = SelectedPreset.Get();
-		for (auto Texture : Preset->Files) {
-			TexturePresetLibrary::ApplyToTexture(Preset, Texture);
-			Texture->PostEditChange();
+		if (Preset) {
+			for (auto Texture : Preset->Files) {
+				if (Texture) {
+					TexturePresetLibrary::ApplyToTexture(Preset, Texture);
+					Texture->PostEditChange();
+				}
+			}
 		}
 	}
 
@@ -965,7 +1126,10 @@ FReply SMyTwoColumnWidget::OnSaveButtonClicked()
 		return FReply::Handled();
 	}
 
-	const FString DefaultPath = TEXT("/Game/TexturePresets");
+	TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(TEXT("TextureManager"));
+	if (!Plugin)
+		return FReply::Handled();
+	const FString DefaultPath = Plugin->GetMountedAssetPath() + "TexturePresets";
 
 	// Find the preset currently assigned to this texture (if any)
 	UTexturePresetUserData* PresetUserData = 
@@ -1012,6 +1176,7 @@ FReply SMyTwoColumnWidget::OnSaveButtonClicked()
 		RefreshPresetList();
 		SelectPresetInCombo(SelectedPreset.Get());
 		bPendingPresetChange = false;
+		SaveDirtyTexturesAndPresets();
 		return FReply::Handled();
 	}
 
@@ -1107,6 +1272,7 @@ FReply SMyTwoColumnWidget::OnSaveButtonClicked()
 
 	RefreshPresetList();
 	SelectPresetInCombo(SelectedPreset.Get());
+	SaveDirtyTexturesAndPresets();
 	return FReply::Handled();
 
 #endif
@@ -1150,33 +1316,37 @@ FReply SMyTwoColumnWidget::OnPresetSaveButtonClicked()
 			}
 		}
 	}
-
+	SaveDirtyTexturesAndPresets();
 	return FReply::Handled();
 }
 
 FReply SMyTwoColumnWidget::OnPresetNewButtonClicked()
 {
 	FString ChosenName;
-	const FString DefaultPath = TEXT("/Game/TexturePresets");
-	const FString DefaultName = FString::Printf(TEXT("New_Copy"));
-
-	// Ask the user for the preset name (path is locked)
-	if (!PromptForPresetName(DefaultName, ChosenName, DefaultPath))
+	//const FString DefaultPath = TEXT("/Game/TexturePresets");
+	if (TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(TEXT("TextureManager")))
 	{
-		// User cancelled
-		return FReply::Handled();
+		const FString PluginRoot = Plugin->GetMountedAssetPath() + "TexturePresets"; // e.g. "/TextureManager
+		const FString DefaultName = FString::Printf(TEXT("New_Copy"));
+
+		// Ask the user for the preset name (path is locked)
+		if (!PromptForPresetName(DefaultName, ChosenName, PluginRoot))
+		{
+			// User cancelled
+			return FReply::Handled();
+		}
+
+		const FName AssetName(*ChosenName);
+
+		if (UTexturePresetAsset* NewPreset =
+			TexturePresetLibrary::CreatePresetAsset(PluginRoot, AssetName))
+		{
+		}
+
+		RefreshPresetList();
+		SelectPresetInCombo(SelectedPreset.Get());
+		bPendingPresetChange = false;
 	}
-
-	const FName AssetName(*ChosenName);
-
-	if (UTexturePresetAsset* NewPreset =
-		TexturePresetLibrary::CreatePresetAsset(DefaultPath, AssetName))
-	{
-	}
-
-	RefreshPresetList();
-	SelectPresetInCombo(SelectedPreset.Get());
-	bPendingPresetChange = false;
 	return FReply::Handled();
 }
 
@@ -1448,4 +1618,63 @@ void SMyTwoColumnWidget::OnDetailsPropertyChanged(const FPropertyChangedEvent& E
 			Texture->PostEditChange();
 		}
 	}
+}
+
+void SMyTwoColumnWidget::SaveDirtyTexturesAndPresets()
+{
+#if WITH_EDITOR
+	TArray<UPackage*> PackagesToSave;
+
+	// 1) Gather dirty texture packages
+	for (const FTextureItem& Item : AllTextureItems)
+	{
+		if (!Item.IsValid())
+		{
+			continue;
+		}
+
+		if (UTexture2D* Texture = Item.Get())
+		{
+			if (UPackage* Package = Texture->GetOutermost())
+			{
+				if (Package->IsDirty())
+				{
+					PackagesToSave.AddUnique(Package);
+				}
+			}
+		}
+	}
+
+	// 2) Gather dirty preset packages
+	for (const FPresetItem& Item : AllPresetItems)
+	{
+		if (!Item.IsValid())
+		{
+			continue;
+		}
+
+		if (UTexturePresetAsset* Preset = Item.Get())
+		{
+			if (UPackage* Package = Preset->GetOutermost())
+			{
+				if (Package->IsDirty())
+				{
+					PackagesToSave.AddUnique(Package);
+				}
+			}
+		}
+	}
+
+	if (PackagesToSave.Num() == 0)
+	{
+		return;
+	}
+
+	// Save without another "Do you want to save?" prompt – pressing our Save
+	// button is already the explicit intent to save these assets.
+	FEditorFileUtils::PromptForCheckoutAndSave(
+		PackagesToSave,
+		/*bCheckDirty=*/false,
+		/*bPromptToSave=*/false);
+#endif // WITH_EDITOR
 }

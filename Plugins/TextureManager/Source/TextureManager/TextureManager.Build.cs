@@ -34,6 +34,7 @@ public class TextureManager : ModuleRules
 				"InputCore",
 				"PropertyEditor", 
 				"ApplicationCore",
+                "Projects",
             }
 			);
 			

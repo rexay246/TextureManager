@@ -17,6 +17,7 @@ public:
 	virtual void ShutdownModule() override;
 	TSharedRef<SDockTab> OnSpawnPluginTab(const FSpawnTabArgs& Args);
 	void RegisterMenus();
+	void OnAssetsPreDelete(const TArray<UObject*>& Assets);
 
 	UPROPERTY()
 	UObject* SomeObjectToEdit = nullptr;

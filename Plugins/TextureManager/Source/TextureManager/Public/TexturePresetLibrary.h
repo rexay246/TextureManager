@@ -37,4 +37,6 @@ namespace TexturePresetLibrary
 	void UpdatePresetFromTexture(UTexturePresetAsset* PresetAsset, UTexture2D* Texture);
 
 	void CopyProperties(UTexturePresetAsset* AssetIn, UTexturePresetAsset* AssetOut);
+
+	void RemovePresetFromTexture(UTexture2D* Texture);
 }
