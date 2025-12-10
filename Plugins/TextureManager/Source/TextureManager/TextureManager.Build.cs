@@ -33,7 +33,8 @@ public class TextureManager : ModuleRules
 				"Engine",
 				"InputCore",
 				"PropertyEditor", 
-				"ApplicationCore"
+				"ApplicationCore",
+                "EditorScriptingUtilities"
             }
 			);
 			

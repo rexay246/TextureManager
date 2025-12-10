@@ -3,6 +3,7 @@
 #include "TexturePresetAsset.h"
 #include "TexturePresetUserData.h"
 #include "Engine/Texture.h"
+#include "EditorAssetLibrary.h"
 
 #if WITH_EDITOR
 #include "AssetRegistry/AssetRegistryModule.h"
@@ -47,6 +48,18 @@ namespace TexturePresetLibrary
 		Out.NeverStream = Texture->NeverStream;
 		Out.bForceMiplevelsToBeResident = Texture->bForceMiplevelsToBeResident;
 		//Out.StreamingDistanceMultiplier = Texture->StreamingDistanceMultiplier;
+
+		Out.Brightness = Texture->AdjustBrightness;
+		Out.BrightnessCurve = Texture->AdjustBrightnessCurve;
+		Out.Vibrance = Texture->AdjustVibrance;
+		Out.Saturation = Texture->AdjustSaturation;
+		Out.RGBCurve = Texture->AdjustRGBCurve;
+		Out.Hue = Texture->AdjustHue;
+		Out.MinAlpha = Texture->AdjustMinAlpha;
+		Out.MaxAlpha = Texture->AdjustMaxAlpha;
+		Out.ChromaKeyTexture = Texture->bChromaKeyTexture;
+		Out.ChromaKeyThreshold = Texture->ChromaKeyThreshold;
+		Out.ChromaKeyColor = Texture->ChromaKeyColor;
 
 		// --- Virtual texturing ---
 		Out.VirtualTextureStreaming = Texture->VirtualTextureStreaming;
@@ -112,7 +125,6 @@ namespace TexturePresetLibrary
 		//Texture->MarkPackageDirty();
 	}
 
-
 	UTexturePresetAsset* CreatePresetAssetFromTexture(
 		UTexture2D* Texture,
 		const FString& PackagePath,
@@ -175,6 +187,57 @@ namespace TexturePresetLibrary
 #endif
 	}
 
+	UTexturePresetAsset* CreatePresetAsset(const FString& PackagePath, FName PresetName)
+	{
+#if WITH_EDITOR
+		// Default path if none provided
+		const FString SanitizedPath = PackagePath.IsEmpty()
+			? TEXT("/Game/TexturePresets")
+			: PackagePath;
+
+		if (PresetName.IsNone())
+		{
+			PresetName = *FString::Printf(TEXT("Test_Preset"));
+		}
+
+		const FString FullPackageName = SanitizedPath / PresetName.ToString();
+
+		UPackage* Package = CreatePackage(*FullPackageName);
+		if (!Package)
+		{
+			return nullptr;
+		}
+
+		Package->FullyLoad();
+
+		UTexturePresetAsset* NewPreset =
+			NewObject<UTexturePresetAsset>(
+				Package,
+				UTexturePresetAsset::StaticClass(),
+				PresetName,
+				RF_Public | RF_Standalone | RF_Transactional);
+
+		if (!NewPreset)
+		{
+			return nullptr;
+		}
+
+		// Give it a logical display name
+		NewPreset->PresetName = PresetName;
+
+		// Register in asset registry
+		FAssetRegistryModule& AssetRegistryModule =
+			FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+		AssetRegistryModule.AssetCreated(NewPreset);
+
+		Package->MarkPackageDirty();
+
+		return NewPreset;
+#else
+		return nullptr;
+#endif
+	}
+
 	void AssignPresetToTexture(UTexturePresetAsset* PresetAsset, UTexture2D* Texture)
 	{
 #if WITH_EDITOR
@@ -199,10 +262,12 @@ namespace TexturePresetLibrary
 		if (UserData->AssignedPreset && UserData->AssignedPreset->Files.Find(Texture) != INDEX_NONE) {
 			UserData->AssignedPreset->Files.Remove(Texture);
 			UserData->AssignedPreset->MarkPackageDirty();
+			UEditorAssetLibrary::SaveAsset(UserData->AssignedPreset->GetPathName(), false);
 		}
 		UserData->AssignedPreset = PresetAsset;
 		UserData->AssignedPreset->Files.Add(Texture);
 		UserData->AssignedPreset->MarkPackageDirty();
+		UEditorAssetLibrary::SaveAsset(UserData->AssignedPreset->GetPathName(), false);
 
 		//Texture->MarkPackageDirty();
 		//Texture->PostEditChange();

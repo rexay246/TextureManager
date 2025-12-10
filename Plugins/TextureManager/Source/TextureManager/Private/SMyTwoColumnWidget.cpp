@@ -31,6 +31,8 @@
 
 #include "Engine/Engine.h"
 
+#include "EditorAssetLibrary.h"
+
 // ---------- Helper ------------------------
 
 UTexture2D* SMyTwoColumnWidget::CloneTextureTransient(UTexture2D* Source)
@@ -192,6 +194,23 @@ TSharedRef<SWidget> SMyTwoColumnWidget::BuildLeftColumn()
 							.InitiallySelectedItem(CurrentFilterOption)
 							.OnSelectionChanged(this, &SMyTwoColumnWidget::OnFilterComboChange)
 							.Visibility(this, &SMyTwoColumnWidget::IsFilesChosen)
+					]
+
+				// Presets Save
+				+ SVerticalBox::Slot()
+					.AutoHeight()
+					.Padding(2)
+					.HAlign(HAlign_Center)
+					[
+						SNew(SButton)
+							.Text(NSLOCTEXT("TextureManager", "NewButton", "Make New Preset"))
+							.OnClicked(this, &SMyTwoColumnWidget::OnPresetNewButtonClicked)
+							.Visibility_Lambda([this]()
+								{
+									return (ActiveTab != ENavigationTab::Files)
+										? EVisibility::Visible
+										: EVisibility::Collapsed;
+								})
 					]
 
 				// Body switched by tab: Files list / Presets list
@@ -369,6 +388,30 @@ ENavigationTab SMyTwoColumnWidget::GetActiveTab() const
 void SMyTwoColumnWidget::OnTabChanged(ENavigationTab NewTab)
 {
 	ActiveTab = NewTab;
+	
+	if (ActiveTab == ENavigationTab::Files) {
+		if (SelectedPreset.Get()) {
+			auto Preset = SelectedPreset.Get();
+			for (auto Texture : Preset->Files) {
+				TexturePresetLibrary::ApplyToTexture(Preset, Texture);
+				Texture->PostEditChange();
+			}
+		}
+	}
+	else {
+		if (SelectedTexture.Get()) {
+			auto PTexture = SelectedTexture.Get();
+			UTexturePresetUserData* UserData =
+				Cast<UTexturePresetUserData>(
+					PTexture->GetAssetUserDataOfClass(UTexturePresetUserData::StaticClass()));
+			UTexturePresetAsset* Preset = UserData ? UserData->AssignedPreset : nullptr;
+			for (auto Texture : Preset->Files) {
+				TexturePresetLibrary::ApplyToTexture(Preset, Texture);
+				Texture->PostEditChange();
+			}
+		}
+	}
+
 	SelectedPreset = nullptr;
 	SelectedTexture = nullptr;
 	TextureListView->ClearSelection();
@@ -599,6 +642,18 @@ bool SMyTwoColumnWidget::PromptForPresetName(const FString& DefaultName, FString
 
 void SMyTwoColumnWidget::OnTextureSelected(FTextureItem Item, ESelectInfo::Type SelectInfo)
 {
+	if (SelectedTexture.Get()) {
+		auto PTexture = SelectedTexture.Get();
+		UTexturePresetUserData* UserData =
+			Cast<UTexturePresetUserData>(
+				PTexture->GetAssetUserDataOfClass(UTexturePresetUserData::StaticClass()));
+		UTexturePresetAsset* Preset = UserData ? UserData->AssignedPreset : nullptr;
+		for (auto Texture : Preset->Files) {
+			TexturePresetLibrary::ApplyToTexture(Preset, Texture);
+			Texture->PostEditChange();
+		}
+	}
+
 	SelectedTexture = Item;
 	bPendingPresetChange = false;
 	bPendingPropertyChange = false;
@@ -643,6 +698,7 @@ void SMyTwoColumnWidget::OnTextureSelected(FTextureItem Item, ESelectInfo::Type 
 		bPendingPresetChange = true;
 	}
 	TexturePresetLibrary::ApplyToTexture(Preset, Texture);
+	Texture->PostEditChange();
 
 	ActiveTab = ENavigationTab::Files;
 	SyncSelectionToDetails();
@@ -650,6 +706,14 @@ void SMyTwoColumnWidget::OnTextureSelected(FTextureItem Item, ESelectInfo::Type 
 
 void SMyTwoColumnWidget::OnPresetSelected(FPresetItem Item, ESelectInfo::Type SelectInfo)
 {
+	if (SelectedPreset.Get()) {
+		auto Preset = SelectedPreset.Get();
+		for (auto Texture : Preset->Files) {
+			TexturePresetLibrary::ApplyToTexture(Preset, Texture);
+			Texture->PostEditChange();
+		}
+	}
+
 	SelectedPreset = Item;
 
 	if (ActiveTab == ENavigationTab::Presets && DetailsView.IsValid())
@@ -836,7 +900,13 @@ void SMyTwoColumnWidget::OnPresetComboChanged(TSharedPtr<FString> NewSelection,E
 	// 2) Apply all preset settings to the texture
 	 
 	//TexturePresetLibrary::AssignPresetToTexture(NewPreset, Texture);
+
+	//Texture->Modify();
+	//TexturePresetLibrary::AssignPresetToTexture(NewPreset, Texture);
 	TexturePresetLibrary::ApplyToTexture(NewPreset, Texture);
+	Texture->PostEditChange();
+	//TexturePresetLibrary::ApplyToTexture(NewPreset, Texture);
+
 #endif
 
 	SelectedPreset = NewPreset;
@@ -861,6 +931,8 @@ void SMyTwoColumnWidget::OnPresetComboChanged(TSharedPtr<FString> NewSelection,E
 
 FReply SMyTwoColumnWidget::OnSaveButtonClicked()
 {
+	SCOPE_CYCLE_COUNTER(STAT_TextureManager_OnSaveButtonClicked);
+
 #if !WITH_EDITOR
 	return FReply::Handled();
 #else
@@ -983,12 +1055,22 @@ FReply SMyTwoColumnWidget::OnSaveButtonClicked()
 			for (UTexture2D* Other : LinkedTextures)
 			{
 				if (Other)
-				{
+				{			
+					Other->Modify();
+					TexturePresetLibrary::AssignPresetToTexture(CurrentPreset, Other);
 					TexturePresetLibrary::ApplyToTexture(CurrentPreset, Other);
+					Other->PostEditChange();
+					UEditorAssetLibrary::SaveAsset(Other->GetPathName(), false);
 				}
 			}
 
 			SelectedPreset = CurrentPreset;
+
+			SelectedTexture.Get()->Modify();
+			TexturePresetLibrary::AssignPresetToTexture(SelectedPreset.Get(), SelectedTexture.Get());
+			TexturePresetLibrary::ApplyToTexture(SelectedPreset.Get(), SelectedTexture.Get());
+			SelectedTexture.Get()->PostEditChange();
+			UEditorAssetLibrary::SaveAsset(SelectedPreset.Get()->GetPathName(), false);
 			//SaveFiles(SelectedItems);
 		}
 		else if (Response == EAppReturnType::No)
@@ -1008,6 +1090,11 @@ FReply SMyTwoColumnWidget::OnSaveButtonClicked()
 
 					SelectedPreset = NewPreset;
 					//SaveFiles(SelectedItems);
+					SelectedTexture.Get()->Modify();		
+					TexturePresetLibrary::AssignPresetToTexture(SelectedPreset.Get(), SelectedTexture.Get());
+					TexturePresetLibrary::ApplyToTexture(SelectedPreset.Get(), SelectedTexture.Get());
+					SelectedTexture.Get()->PostEditChange();
+					UEditorAssetLibrary::SaveAsset(SelectedTexture.Get()->GetPathName(), false);
 				}
 			}
 		}
@@ -1032,6 +1119,8 @@ FReply SMyTwoColumnWidget::OnSaveButtonClicked()
 
 FReply SMyTwoColumnWidget::OnPresetSaveButtonClicked()
 {
+	SCOPE_CYCLE_COUNTER(STAT_TextureManager_OnPresetSaveButtonClicked);
+
 	UTexturePresetAsset* CurrentPreset = SelectedPreset.Get();
 
 	TArray<UTexture2D*> LinkedTextures = CurrentPreset->Files;
@@ -1052,19 +1141,49 @@ FReply SMyTwoColumnWidget::OnPresetSaveButtonClicked()
 
 	if (Response == EAppReturnType::Yes)
 	{
-
 		TexturePresetLibrary::CopyProperties(PreviewPreset, CurrentPreset);
 		CurrentPreset->MarkPackageDirty();
+		UEditorAssetLibrary::SaveAsset(CurrentPreset->GetPathName(), false);
 
 		for (UTexture2D* Other : LinkedTextures)
 		{
 			if (Other)
 			{			
-				TexturePresetLibrary::ApplyToTexture(CurrentPreset, Other);;		
+				Other->Modify();
+				TexturePresetLibrary::AssignPresetToTexture(CurrentPreset, Other);
+				TexturePresetLibrary::ApplyToTexture(CurrentPreset, Other);
+				Other->PostEditChange();
+				UEditorAssetLibrary::SaveAsset(Other->GetPathName(), false);
 			}
 		}
 	}
 
+	return FReply::Handled();
+}
+
+FReply SMyTwoColumnWidget::OnPresetNewButtonClicked()
+{
+	FString ChosenName;
+	const FString DefaultPath = TEXT("/Game/TexturePresets");
+	const FString DefaultName = FString::Printf(TEXT("New_Copy"));
+
+	// Ask the user for the preset name (path is locked)
+	if (!PromptForPresetName(DefaultName, ChosenName, DefaultPath))
+	{
+		// User cancelled
+		return FReply::Handled();
+	}
+
+	const FName AssetName(*ChosenName);
+
+	if (UTexturePresetAsset* NewPreset =
+		TexturePresetLibrary::CreatePresetAsset(DefaultPath, AssetName))
+	{
+	}
+
+	RefreshPresetList();
+	SelectPresetInCombo(SelectedPreset.Get());
+	bPendingPresetChange = false;
 	return FReply::Handled();
 }
 
@@ -1310,8 +1429,10 @@ void SMyTwoColumnWidget::SaveFiles(TArray<FTextureItem> SelectedItems) {
 			UTexture2D* NewTexture = Item.Get();
 			NewTexture->Modify();
 			TexturePresetLibrary::AssignPresetToTexture(SelectedPreset.Get(), NewTexture);
+			TexturePresetLibrary::ApplyToTexture(SelectedPreset.Get(), NewTexture);
 			NewTexture->PostEditChange();
-			NewTexture->MarkPackageDirty();
+			//NewTexture->MarkPackageDirty();
+			UEditorAssetLibrary::SaveAsset(NewTexture->GetPathName(), false);
 		}
 	}
 }
@@ -1319,4 +1440,20 @@ void SMyTwoColumnWidget::SaveFiles(TArray<FTextureItem> SelectedItems) {
 void SMyTwoColumnWidget::OnDetailsPropertyChanged(const FPropertyChangedEvent& Event)
 {
 	bPendingPropertyChange = true;
+	if (ActiveTab == ENavigationTab::Presets) {
+		auto Preset = PreviewPreset;
+		for (auto Texture : Preset->Files) {
+			TexturePresetLibrary::ApplyToTexture(Preset, Texture);
+			Texture->PostEditChange();
+		}
+	}
+	else {
+		auto PTexture = PreviewTexture;
+		UTexturePresetAsset* Copy = ClonePresetTransient(SelectedPreset.Get());;
+		TexturePresetLibrary::CaptureFromTexture(Copy, PTexture);
+		for (auto Texture : Copy->Files) {
+			TexturePresetLibrary::ApplyToTexture(Copy, Texture);
+			Texture->PostEditChange();
+		}
+	}
 }

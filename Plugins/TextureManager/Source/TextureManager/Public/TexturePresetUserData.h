@@ -11,6 +11,6 @@ class UTexturePresetUserData : public UAssetUserData
     GENERATED_BODY()
 
 public:
-    UPROPERTY(EditAnywhere, Category = "Texture Preset")
+    UPROPERTY(VisibleAnywhere, Category = "Texture Preset")
     TObjectPtr<UTexturePresetAsset> AssignedPreset;
 };

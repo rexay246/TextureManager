@@ -69,6 +69,7 @@ void FTextureManagerModule::OnAssetImported(UFactory* Factory, UObject* Imported
         // Set the imported object to be shown in the details panel
         SomeObjectToEdit = Imported;
 
+
         // Check if the tab is already open. If not, spawn it.
         if (!FGlobalTabmanager::Get()->FindExistingLiveTab(FName("TextureManager")))
         {

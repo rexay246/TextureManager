@@ -7,11 +7,20 @@
 #include "Widgets/Input/STextComboBox.h"
 #include "Widgets/Input/SSegmentedControl.h"
 #include "UObject/WeakObjectPtrTemplates.h"
+#include "Stats/Stats.h"
 
 class IDetailsView;
 class UTexture2D;
 class UTexturePresetAsset;
 struct FPropertyChangedEvent;
+
+DECLARE_STATS_GROUP(TEXT("TextureManager"), STATGROUP_TextureManager, STATCAT_Advanced);
+
+DECLARE_CYCLE_STAT(TEXT("TextureManager|OnSaveButtonClicked"),
+	STAT_TextureManager_OnSaveButtonClicked, STATGROUP_TextureManager);
+
+DECLARE_CYCLE_STAT(TEXT("TextureManager|OnPresetSaveButtonClicked"),
+	STAT_TextureManager_OnPresetSaveButtonClicked, STATGROUP_TextureManager);
 
 // Which "mode" the right side is in
 enum class ENavigationTab : uint8
@@ -134,6 +143,7 @@ private:
 	void OnPresetComboChanged(TSharedPtr<FString> NewSelection, ESelectInfo::Type SelectInfo);
 	FReply OnSaveButtonClicked();
 	FReply OnPresetSaveButtonClicked();
+	FReply OnPresetNewButtonClicked();
 
 	// ---------- Change detection ----------
 
