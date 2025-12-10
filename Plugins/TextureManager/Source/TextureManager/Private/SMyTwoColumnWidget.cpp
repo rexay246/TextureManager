@@ -31,8 +31,6 @@
 
 #include "Engine/Engine.h"
 
-#include "EditorAssetLibrary.h"
-
 // ---------- Helper ------------------------
 
 UTexture2D* SMyTwoColumnWidget::CloneTextureTransient(UTexture2D* Source)
@@ -1060,7 +1058,6 @@ FReply SMyTwoColumnWidget::OnSaveButtonClicked()
 					TexturePresetLibrary::AssignPresetToTexture(CurrentPreset, Other);
 					TexturePresetLibrary::ApplyToTexture(CurrentPreset, Other);
 					Other->PostEditChange();
-					UEditorAssetLibrary::SaveAsset(Other->GetPathName(), false);
 				}
 			}
 
@@ -1070,7 +1067,6 @@ FReply SMyTwoColumnWidget::OnSaveButtonClicked()
 			TexturePresetLibrary::AssignPresetToTexture(SelectedPreset.Get(), SelectedTexture.Get());
 			TexturePresetLibrary::ApplyToTexture(SelectedPreset.Get(), SelectedTexture.Get());
 			SelectedTexture.Get()->PostEditChange();
-			UEditorAssetLibrary::SaveAsset(SelectedPreset.Get()->GetPathName(), false);
 			//SaveFiles(SelectedItems);
 		}
 		else if (Response == EAppReturnType::No)
@@ -1094,7 +1090,6 @@ FReply SMyTwoColumnWidget::OnSaveButtonClicked()
 					TexturePresetLibrary::AssignPresetToTexture(SelectedPreset.Get(), SelectedTexture.Get());
 					TexturePresetLibrary::ApplyToTexture(SelectedPreset.Get(), SelectedTexture.Get());
 					SelectedTexture.Get()->PostEditChange();
-					UEditorAssetLibrary::SaveAsset(SelectedTexture.Get()->GetPathName(), false);
 				}
 			}
 		}
@@ -1143,7 +1138,6 @@ FReply SMyTwoColumnWidget::OnPresetSaveButtonClicked()
 	{
 		TexturePresetLibrary::CopyProperties(PreviewPreset, CurrentPreset);
 		CurrentPreset->MarkPackageDirty();
-		UEditorAssetLibrary::SaveAsset(CurrentPreset->GetPathName(), false);
 
 		for (UTexture2D* Other : LinkedTextures)
 		{
@@ -1153,7 +1147,6 @@ FReply SMyTwoColumnWidget::OnPresetSaveButtonClicked()
 				TexturePresetLibrary::AssignPresetToTexture(CurrentPreset, Other);
 				TexturePresetLibrary::ApplyToTexture(CurrentPreset, Other);
 				Other->PostEditChange();
-				UEditorAssetLibrary::SaveAsset(Other->GetPathName(), false);
 			}
 		}
 	}
@@ -1432,7 +1425,6 @@ void SMyTwoColumnWidget::SaveFiles(TArray<FTextureItem> SelectedItems) {
 			TexturePresetLibrary::ApplyToTexture(SelectedPreset.Get(), NewTexture);
 			NewTexture->PostEditChange();
 			//NewTexture->MarkPackageDirty();
-			UEditorAssetLibrary::SaveAsset(NewTexture->GetPathName(), false);
 		}
 	}
 }

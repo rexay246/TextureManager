@@ -18,7 +18,10 @@
 		{
 			"Name": "TextureManager",
 			"Type": "Editor",
-			"LoadingPhase": "PostEngineInit"
+			"LoadingPhase": "PostEngineInit",
+			"AdditionalDependencies": [
+				"EditorScriptingUtilities"
+			]
 		}
 	]
 }

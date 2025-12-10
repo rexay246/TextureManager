@@ -3,7 +3,6 @@
 #include "TexturePresetAsset.h"
 #include "TexturePresetUserData.h"
 #include "Engine/Texture.h"
-#include "EditorAssetLibrary.h"
 
 #if WITH_EDITOR
 #include "AssetRegistry/AssetRegistryModule.h"
@@ -262,12 +261,10 @@ namespace TexturePresetLibrary
 		if (UserData->AssignedPreset && UserData->AssignedPreset->Files.Find(Texture) != INDEX_NONE) {
 			UserData->AssignedPreset->Files.Remove(Texture);
 			UserData->AssignedPreset->MarkPackageDirty();
-			UEditorAssetLibrary::SaveAsset(UserData->AssignedPreset->GetPathName(), false);
 		}
 		UserData->AssignedPreset = PresetAsset;
 		UserData->AssignedPreset->Files.Add(Texture);
 		UserData->AssignedPreset->MarkPackageDirty();
-		UEditorAssetLibrary::SaveAsset(UserData->AssignedPreset->GetPathName(), false);
 
 		//Texture->MarkPackageDirty();
 		//Texture->PostEditChange();
