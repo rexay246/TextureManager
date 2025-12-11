@@ -1278,6 +1278,18 @@ FReply SMyTwoColumnWidget::OnSaveButtonClicked()
 		}
 		else if (Response == EAppReturnType::No)
 		{
+			if (SelectedPreset.Get()) {
+				auto Preset = SelectedPreset.Get();
+				if (Preset) {
+					for (auto newTexture : Preset->Files) {
+						if (newTexture) {
+							TexturePresetLibrary::ApplyToTexture(Preset, newTexture);
+							newTexture->PostEditChange();
+						}
+					}
+				}
+			}
+
 			// Create a brand-new preset only for this texture
 			// This is where we show the "name your new preset" window.
 			const FString DefaultName = FString::Printf(TEXT("%s_Custom"), *Texture->GetName());
