@@ -38,6 +38,8 @@
 #include "Framework/Application/SlateApplication.h"
 #include "Containers/Ticker.h"
 
+#include "TextureManagerStats.h"
+
 // ---------- Helper ------------------------
 
 UTexture2D* SMyTwoColumnWidget::CloneTextureTransient(UTexture2D* Source)
@@ -477,7 +479,6 @@ void SMyTwoColumnWidget::RefreshTextureList()
 //	{
 //		TextureListView->RequestListRefresh();
 //	}
-
 	//TextureItems.Reset();
 	AllTextureItems.Reset();
 	FilteredTextureItems.Reset();
@@ -594,8 +595,8 @@ void SMyTwoColumnWidget::RefreshPresetList()
 //	// Re-select current preset in combo if any
 //	SelectPresetInCombo(SelectedPreset.Get());
 //	CurrentFilterOption = FilterPresetLabels[FilterIndex];
-
 		//PresetItems.Reset();
+	//SCOPE_CYCLE_COUNTER(STAT_TextureManager_RefreshPresetList);
 	AllPresetItems.Reset();
 	FilteredPresetItems.Reset();
 
@@ -1133,199 +1134,201 @@ void SMyTwoColumnWidget::OnPresetComboChanged(TSharedPtr<FString> NewSelection,E
 
 FReply SMyTwoColumnWidget::OnSaveButtonClicked()
 {
-	SCOPE_CYCLE_COUNTER(STAT_TextureManager_OnSaveButtonClicked);
+	{
+		SCOPE_CYCLE_COUNTER(STAT_TextureManager_OnSaveButtonClicked);
 
 #if !WITH_EDITOR
-	return FReply::Handled();
+		return FReply::Handled();
 #else
-	// We always need a selected texture as the "source of truth"
-	if (!SelectedTexture.IsValid())
-	{
-		return FReply::Handled();
-	}
-
-	// Collect selected textures from the list view
-	TArray<FTextureItem> SelectedItems;
-
-	if (TextureListView.IsValid())
-	{
-		TextureListView->GetSelectedItems(SelectedItems);
-	}
-
-	UTexture2D* Texture = PreviewTexture;
-	if (!Texture)
-	{
-		return FReply::Handled();
-	}
-
-	if (SelectedItems.Num() == 0 && SelectedTexture.IsValid())
-	{
-		SelectedItems.Add(SelectedTexture);
-	}
-
-	if (SelectedItems.Num() == 0)
-	{
-		// Nothing to apply to
-		return FReply::Handled();
-	}
-
-	TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(TEXT("TextureManager"));
-	if (!Plugin)
-		return FReply::Handled();
-	const FString DefaultPath = Plugin->GetMountedAssetPath() + "TexturePresets";
-
-	// Find the preset currently assigned to this texture (if any)
-	UTexturePresetUserData* PresetUserData = 
-		Cast<UTexturePresetUserData>(
-			Texture->GetAssetUserDataOfClass(UTexturePresetUserData::StaticClass()));
-
-	UTexturePresetAsset* CurrentPreset = SelectedPreset.Get(); //PresetUserData ? PresetUserData->AssignedPreset : nullptr;
-
-	// If nothing has changed there is nothing to save
-	if (!bPendingPresetChange && CurrentPreset && !bPendingPropertyChange)
-	{
-		return FReply::Handled();
-	}
-
-	FString ChosenName;
-
-	// ----------------------------
-	// Case 1: No preset yet -> always create a new preset
-	// ----------------------------
-	if (!CurrentPreset)
-	{
-		Texture = SelectedTexture.Get();
-		const FString DefaultName = FString::Printf(TEXT("%s_Preset"), *Texture->GetName());
-
-		// Ask the user for the preset name (path is locked)
-		if (!PromptForPresetName(DefaultName, ChosenName, DefaultPath))
+		// We always need a selected texture as the "source of truth"
+		if (!SelectedTexture.IsValid())
 		{
-			// User cancelled
 			return FReply::Handled();
 		}
 
-		const FName AssetName(*ChosenName);
+		// Collect selected textures from the list view
+		TArray<FTextureItem> SelectedItems;
 
-		if (UTexturePresetAsset* NewPreset =
-			TexturePresetLibrary::CreatePresetAssetFromTexture(Texture, DefaultPath, AssetName))
+		if (TextureListView.IsValid())
 		{
-			// Also store the friendly display name
-			NewPreset->PresetName = AssetName;
+			TextureListView->GetSelectedItems(SelectedItems);
+		}
 
-			//TexturePresetLibrary::AssignPresetToTexture(NewPreset, Texture);
-			SelectedPreset = NewPreset;
+		UTexture2D* Texture = PreviewTexture;
+		if (!Texture)
+		{
+			return FReply::Handled();
+		}
+
+		if (SelectedItems.Num() == 0 && SelectedTexture.IsValid())
+		{
+			SelectedItems.Add(SelectedTexture);
+		}
+
+		if (SelectedItems.Num() == 0)
+		{
+			// Nothing to apply to
+			return FReply::Handled();
+		}
+
+		TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(TEXT("TextureManager"));
+		if (!Plugin)
+			return FReply::Handled();
+		const FString DefaultPath = Plugin->GetMountedAssetPath() + "TexturePresets";
+
+		// Find the preset currently assigned to this texture (if any)
+		UTexturePresetUserData* PresetUserData =
+			Cast<UTexturePresetUserData>(
+				Texture->GetAssetUserDataOfClass(UTexturePresetUserData::StaticClass()));
+
+		UTexturePresetAsset* CurrentPreset = SelectedPreset.Get(); //PresetUserData ? PresetUserData->AssignedPreset : nullptr;
+
+		// If nothing has changed there is nothing to save
+		if (!bPendingPresetChange && CurrentPreset && !bPendingPropertyChange)
+		{
+			return FReply::Handled();
+		}
+
+		FString ChosenName;
+
+		// ----------------------------
+		// Case 1: No preset yet -> always create a new preset
+		// ----------------------------
+		if (!CurrentPreset)
+		{
+			Texture = SelectedTexture.Get();
+			const FString DefaultName = FString::Printf(TEXT("%s_Preset"), *Texture->GetName());
+
+			// Ask the user for the preset name (path is locked)
+			if (!PromptForPresetName(DefaultName, ChosenName, DefaultPath))
+			{
+				// User cancelled
+				return FReply::Handled();
+			}
+
+			const FName AssetName(*ChosenName);
+
+			if (UTexturePresetAsset* NewPreset =
+				TexturePresetLibrary::CreatePresetAssetFromTexture(Texture, DefaultPath, AssetName))
+			{
+				// Also store the friendly display name
+				NewPreset->PresetName = AssetName;
+
+				//TexturePresetLibrary::AssignPresetToTexture(NewPreset, Texture);
+				SelectedPreset = NewPreset;
+				SaveFiles(SelectedItems);
+			}
+
+			RefreshPresetList();
+			SelectPresetInCombo(SelectedPreset.Get());
+			bPendingPresetChange = false;
+			SaveDirtyTexturesAndPresets();
+			return FReply::Handled();
+		}
+
+		// ----------------------------
+		// Changing Presets
+		// ----------------------------
+
+		TArray<UTexture2D*> LinkedTextures = CurrentPreset->Files;
+		//TexturePresetLibrary::GetAllTexturesUsingPreset(CurrentPreset);
+
+		if (bPendingPropertyChange) {
+			const FText Message = FText::Format(
+				NSLOCTEXT("TexturePreset", "OverwriteOrNew",
+					"This preset '{0}' is currently used by {1} texture(s).\n\n"
+					"Yes = Overwrite preset for all textures.\n"
+					"No = Create a new preset only for this texture.\n"
+					"Cancel = Do nothing."),
+				FText::FromString(
+					CurrentPreset->PresetName.IsNone()
+					? CurrentPreset->GetName()
+					: CurrentPreset->PresetName.ToString()),
+				FText::AsNumber(LinkedTextures.Num()));
+
+			const EAppReturnType::Type Response =
+				FMessageDialog::Open(
+					EAppMsgType::YesNoCancel,
+					Message,
+					NSLOCTEXT("TexturePreset", "SavePresetTitle", "Save Preset"));
+
+			if (Response == EAppReturnType::Yes)
+			{
+				// Overwrite existing preset using its current name.
+				// No extra "name" window here; we keep the original preset name.
+				TexturePresetLibrary::UpdatePresetFromTexture(CurrentPreset, Texture);
+
+				// Re-apply to all linked textures so they pick up the new settings
+				for (UTexture2D* Other : LinkedTextures)
+				{
+					if (Other)
+					{
+						Other->Modify();
+						TexturePresetLibrary::AssignPresetToTexture(CurrentPreset, Other);
+						TexturePresetLibrary::ApplyToTexture(CurrentPreset, Other);
+						Other->PostEditChange();
+					}
+				}
+
+				SelectedPreset = CurrentPreset;
+
+				SelectedTexture.Get()->Modify();
+				TexturePresetLibrary::AssignPresetToTexture(SelectedPreset.Get(), SelectedTexture.Get());
+				TexturePresetLibrary::ApplyToTexture(SelectedPreset.Get(), SelectedTexture.Get());
+				SelectedTexture.Get()->PostEditChange();
+				//SaveFiles(SelectedItems);
+			}
+			else if (Response == EAppReturnType::No)
+			{
+				if (SelectedPreset.Get()) {
+					auto Preset = SelectedPreset.Get();
+					if (Preset) {
+						for (auto newTexture : Preset->Files) {
+							if (newTexture) {
+								TexturePresetLibrary::ApplyToTexture(Preset, newTexture);
+								newTexture->PostEditChange();
+							}
+						}
+					}
+				}
+
+				// Create a brand-new preset only for this texture
+				// This is where we show the "name your new preset" window.
+				const FString DefaultName = FString::Printf(TEXT("%s_Custom"), *Texture->GetName());
+
+				if (PromptForPresetName(DefaultName, ChosenName, DefaultPath))
+				{
+					const FName AssetName(*ChosenName);
+
+					if (UTexturePresetAsset* NewPreset =
+						TexturePresetLibrary::CreatePresetAssetFromTexture(Texture, DefaultPath, AssetName))
+					{
+						NewPreset->PresetName = AssetName;
+
+						SelectedPreset = NewPreset;
+						//SaveFiles(SelectedItems);
+						SelectedTexture.Get()->Modify();
+						TexturePresetLibrary::AssignPresetToTexture(SelectedPreset.Get(), SelectedTexture.Get());
+						TexturePresetLibrary::ApplyToTexture(SelectedPreset.Get(), SelectedTexture.Get());
+						SelectedTexture.Get()->PostEditChange();
+					}
+				}
+			}
+			// Cancel -> do nothing
+			bPendingPropertyChange = false;
+		}
+
+		// ----------------------------
+		// Changing the Preset
+		// ----------------------------
+		if (bPendingPresetChange) {
 			SaveFiles(SelectedItems);
+			bPendingPresetChange = false;
 		}
 
 		RefreshPresetList();
 		SelectPresetInCombo(SelectedPreset.Get());
-		bPendingPresetChange = false;
-		SaveDirtyTexturesAndPresets();
-		return FReply::Handled();
 	}
-
-	// ----------------------------
-	// Changing Presets
-	// ----------------------------
-
-	TArray<UTexture2D*> LinkedTextures = CurrentPreset->Files;
-		//TexturePresetLibrary::GetAllTexturesUsingPreset(CurrentPreset);
-
-	if (bPendingPropertyChange) {
-		const FText Message = FText::Format(
-			NSLOCTEXT("TexturePreset", "OverwriteOrNew",
-				"This preset '{0}' is currently used by {1} texture(s).\n\n"
-				"Yes = Overwrite preset for all textures.\n"
-				"No = Create a new preset only for this texture.\n"
-				"Cancel = Do nothing."),
-			FText::FromString(
-				CurrentPreset->PresetName.IsNone()
-				? CurrentPreset->GetName()
-				: CurrentPreset->PresetName.ToString()),
-			FText::AsNumber(LinkedTextures.Num()));
-
-		const EAppReturnType::Type Response =
-			FMessageDialog::Open(
-				EAppMsgType::YesNoCancel,
-				Message,
-				NSLOCTEXT("TexturePreset", "SavePresetTitle", "Save Preset"));
-
-		if (Response == EAppReturnType::Yes)
-		{
-			// Overwrite existing preset using its current name.
-			// No extra "name" window here; we keep the original preset name.
-			TexturePresetLibrary::UpdatePresetFromTexture(CurrentPreset, Texture);
-
-			// Re-apply to all linked textures so they pick up the new settings
-			for (UTexture2D* Other : LinkedTextures)
-			{
-				if (Other)
-				{			
-					Other->Modify();
-					TexturePresetLibrary::AssignPresetToTexture(CurrentPreset, Other);
-					TexturePresetLibrary::ApplyToTexture(CurrentPreset, Other);
-					Other->PostEditChange();
-				}
-			}
-
-			SelectedPreset = CurrentPreset;
-
-			SelectedTexture.Get()->Modify();
-			TexturePresetLibrary::AssignPresetToTexture(SelectedPreset.Get(), SelectedTexture.Get());
-			TexturePresetLibrary::ApplyToTexture(SelectedPreset.Get(), SelectedTexture.Get());
-			SelectedTexture.Get()->PostEditChange();
-			//SaveFiles(SelectedItems);
-		}
-		else if (Response == EAppReturnType::No)
-		{
-			if (SelectedPreset.Get()) {
-				auto Preset = SelectedPreset.Get();
-				if (Preset) {
-					for (auto newTexture : Preset->Files) {
-						if (newTexture) {
-							TexturePresetLibrary::ApplyToTexture(Preset, newTexture);
-							newTexture->PostEditChange();
-						}
-					}
-				}
-			}
-
-			// Create a brand-new preset only for this texture
-			// This is where we show the "name your new preset" window.
-			const FString DefaultName = FString::Printf(TEXT("%s_Custom"), *Texture->GetName());
-
-			if (PromptForPresetName(DefaultName, ChosenName, DefaultPath))
-			{
-				const FName AssetName(*ChosenName);
-
-				if (UTexturePresetAsset* NewPreset =
-					TexturePresetLibrary::CreatePresetAssetFromTexture(Texture, DefaultPath, AssetName))
-				{
-					NewPreset->PresetName = AssetName;
-
-					SelectedPreset = NewPreset;
-					//SaveFiles(SelectedItems);
-					SelectedTexture.Get()->Modify();		
-					TexturePresetLibrary::AssignPresetToTexture(SelectedPreset.Get(), SelectedTexture.Get());
-					TexturePresetLibrary::ApplyToTexture(SelectedPreset.Get(), SelectedTexture.Get());
-					SelectedTexture.Get()->PostEditChange();
-				}
-			}
-		}
-		// Cancel -> do nothing
-		bPendingPropertyChange = false;
-	}
-
-	// ----------------------------
-	// Changing the Preset
-	// ----------------------------
-	if (bPendingPresetChange) {
-		SaveFiles(SelectedItems);
-		bPendingPresetChange = false;
-	}
-
-	RefreshPresetList();
-	SelectPresetInCombo(SelectedPreset.Get());
 	SaveDirtyTexturesAndPresets();
 	return FReply::Handled();
 
@@ -1334,39 +1337,41 @@ FReply SMyTwoColumnWidget::OnSaveButtonClicked()
 
 FReply SMyTwoColumnWidget::OnPresetSaveButtonClicked()
 {
-	SCOPE_CYCLE_COUNTER(STAT_TextureManager_OnPresetSaveButtonClicked);
+	{
+		SCOPE_CYCLE_COUNTER(STAT_TextureManager_OnPresetSaveButtonClicked);
 
-	UTexturePresetAsset* CurrentPreset = SelectedPreset.Get();
+		UTexturePresetAsset* CurrentPreset = SelectedPreset.Get();
 
-	TArray<UTexture2D*> LinkedTextures = CurrentPreset->Files;
+		TArray<UTexture2D*> LinkedTextures = CurrentPreset->Files;
 		//TexturePresetLibrary::GetAllTexturesUsingPreset(CurrentPreset);
 
-	const FText Message = FText::Format(
-		NSLOCTEXT("TexturePreset", "OverwriteOrNew",
-			"This preset is currently used by {0} texture(s).\n\n"
-			"Yes = Save preset for all textures.\n"
-			"No = Do nothing."),
-		FText::AsNumber(LinkedTextures.Num()));
+		const FText Message = FText::Format(
+			NSLOCTEXT("TexturePreset", "OverwriteOrNew",
+				"This preset is currently used by {0} texture(s).\n\n"
+				"Yes = Save preset for all textures.\n"
+				"No = Do nothing."),
+			FText::AsNumber(LinkedTextures.Num()));
 
-	const EAppReturnType::Type Response =
-		FMessageDialog::Open(
-			EAppMsgType::YesNo,
-			Message,
-			NSLOCTEXT("TexturePreset", "SavePresetTitle", "Save Preset"));
+		const EAppReturnType::Type Response =
+			FMessageDialog::Open(
+				EAppMsgType::YesNo,
+				Message,
+				NSLOCTEXT("TexturePreset", "SavePresetTitle", "Save Preset"));
 
-	if (Response == EAppReturnType::Yes)
-	{
-		TexturePresetLibrary::CopyProperties(PreviewPreset, CurrentPreset);
-		CurrentPreset->MarkPackageDirty();
-
-		for (UTexture2D* Other : LinkedTextures)
+		if (Response == EAppReturnType::Yes)
 		{
-			if (Other)
-			{			
-				Other->Modify();
-				TexturePresetLibrary::AssignPresetToTexture(CurrentPreset, Other);
-				TexturePresetLibrary::ApplyToTexture(CurrentPreset, Other);
-				Other->PostEditChange();
+			TexturePresetLibrary::CopyProperties(PreviewPreset, CurrentPreset);
+			CurrentPreset->MarkPackageDirty();
+
+			for (UTexture2D* Other : LinkedTextures)
+			{
+				if (Other)
+				{
+					Other->Modify();
+					TexturePresetLibrary::AssignPresetToTexture(CurrentPreset, Other);
+					TexturePresetLibrary::ApplyToTexture(CurrentPreset, Other);
+					Other->PostEditChange();
+				}
 			}
 		}
 	}
@@ -1618,6 +1623,7 @@ void SMyTwoColumnWidget::OnPresetsSearchChanged(const FText& InText)
 }
 
 void SMyTwoColumnWidget::SaveFiles(TArray<FTextureItem> SelectedItems) {
+	SCOPE_CYCLE_COUNTER(STAT_TextureManager_OnSaveButtonClicked);
 	// If multiple, confirm with the user
 	if (SelectedItems.Num() > 1)
 	{
@@ -1737,8 +1743,6 @@ void SMyTwoColumnWidget::SaveDirtyTexturesAndPresets()
 		return;
 	}
 
-	// Save without another "Do you want to save?" prompt – pressing our Save
-	// button is already the explicit intent to save these assets.
 	FEditorFileUtils::PromptForCheckoutAndSave(
 		PackagesToSave,
 		/*bCheckDirty=*/false,

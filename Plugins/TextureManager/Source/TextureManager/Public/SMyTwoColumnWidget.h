@@ -14,13 +14,15 @@ class UTexture2D;
 class UTexturePresetAsset;
 struct FPropertyChangedEvent;
 
-DECLARE_STATS_GROUP(TEXT("TextureManager"), STATGROUP_TextureManager, STATCAT_Advanced);
+DECLARE_STATS_GROUP(TEXT("Texture Preset Manager"), STATGROUP_TPM, STATCAT_Advanced);
 
-DECLARE_CYCLE_STAT(TEXT("TextureManager|OnSaveButtonClicked"),
-	STAT_TextureManager_OnSaveButtonClicked, STATGROUP_TextureManager);
+DECLARE_CYCLE_STAT(TEXT("Texture Preset Manager|OnSaveButtonClicked"),
+	STAT_TextureManager_OnSaveButtonClicked,
+	STATGROUP_TPM);
 
-DECLARE_CYCLE_STAT(TEXT("TextureManager|OnPresetSaveButtonClicked"),
-	STAT_TextureManager_OnPresetSaveButtonClicked, STATGROUP_TextureManager);
+DECLARE_CYCLE_STAT(TEXT("Texture Preset Manager|OnPresetSaveButtonClicked"),
+	STAT_TextureManager_OnPresetSaveButtonClicked,
+	STATGROUP_TPM);
 
 // Which "mode" the right side is in
 enum class ENavigationTab : uint8
