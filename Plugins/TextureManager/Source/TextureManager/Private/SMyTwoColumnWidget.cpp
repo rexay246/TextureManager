@@ -34,6 +34,10 @@
 #include "Interfaces/IPluginManager.h"
 #include "FileHelpers.h" 
 
+#include "HAL/PlatformApplicationMisc.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Containers/Ticker.h"
+
 // ---------- Helper ------------------------
 
 UTexture2D* SMyTwoColumnWidget::CloneTextureTransient(UTexture2D* Source)
@@ -114,6 +118,11 @@ void SMyTwoColumnWidget::Construct(const FArguments& InArgs)
 
 	DetailsView->OnFinishedChangingProperties().AddRaw(
 		this, &SMyTwoColumnWidget::OnDetailsPropertyChanged
+	);
+
+	FTSTicker::GetCoreTicker().AddTicker(
+		FTickerDelegate::CreateSP(this, &SMyTwoColumnWidget::BindWindowCloseEventOnce),
+		0.0f
 	);
 }
 
@@ -1677,4 +1686,56 @@ void SMyTwoColumnWidget::SaveDirtyTexturesAndPresets()
 		/*bCheckDirty=*/false,
 		/*bPromptToSave=*/false);
 #endif // WITH_EDITOR
+}
+
+bool SMyTwoColumnWidget::BindWindowCloseEventOnce(float DeltaTime)
+{
+	TSharedPtr<SWindow> Window = FSlateApplication::Get().FindWidgetWindow(AsShared());
+
+	if (!Window.IsValid())
+	{
+		// Try again next frame
+		return true; // continue ticking
+	}
+
+	// Successfully attached to a window → bind the close event
+	Window->GetOnWindowClosedEvent().AddSP(
+		this, &SMyTwoColumnWidget::OnParentWindowClosed
+	);
+
+	return false; // Stop ticking
+}
+
+void SMyTwoColumnWidget::OnParentWindowClosed(const TSharedRef<SWindow>& Window)
+{
+	if (ActiveTab == ENavigationTab::Presets) {
+		if (SelectedPreset.Get()) {
+			auto Preset = SelectedPreset.Get();
+			if (Preset) {
+				for (auto Texture : Preset->Files) {
+					if (Texture) {
+						TexturePresetLibrary::ApplyToTexture(Preset, Texture);
+						Texture->PostEditChange();
+					}
+				}
+			}
+		}
+	}
+	else {
+		if (SelectedTexture.Get()) {
+			auto PTexture = SelectedTexture.Get();
+			UTexturePresetUserData* UserData =
+				Cast<UTexturePresetUserData>(
+					PTexture->GetAssetUserDataOfClass(UTexturePresetUserData::StaticClass()));
+			UTexturePresetAsset* Preset = UserData ? UserData->AssignedPreset : nullptr;
+			if (Preset) {
+				for (auto Texture : Preset->Files) {
+					if (Texture) {
+						TexturePresetLibrary::ApplyToTexture(Preset, Texture);
+						Texture->PostEditChange();
+					}
+				}
+			}
+		}
+	}
 }

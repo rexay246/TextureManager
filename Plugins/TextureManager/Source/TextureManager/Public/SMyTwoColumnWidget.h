@@ -171,4 +171,7 @@ private:
 	void OnDetailsPropertyChanged(const FPropertyChangedEvent& Event);
 
 	void SaveDirtyTexturesAndPresets();
+
+	bool BindWindowCloseEventOnce(float DeltaTime);
+	void OnParentWindowClosed(const TSharedRef<SWindow>& Window);
 };
