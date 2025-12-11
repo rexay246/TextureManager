@@ -6,6 +6,7 @@
 #include "SMyTwoColumnWidget.h"
 #include "Widgets/Docking/SDockTab.h"
 #include "TexturePresetLibrary.h"
+#include "TexturePresetAsset.h"
 
 #define LOCTEXT_NAMESPACE "FTextureManagerModule"
 
@@ -161,16 +162,24 @@ void FTextureManagerModule::OnAssetsPreDelete(const TArray<UObject*>& Assets)
     for (UObject* Obj : Assets)
     {
         UTexture2D* Texture = Cast<UTexture2D>(Obj);
-        if (!Texture) continue;
+        if (Texture) {
 
-        // Remove from preset files list
-        TexturePresetLibrary::RemovePresetFromTexture(Texture);
+            // Remove from preset files list
+            TexturePresetLibrary::RemovePresetFromTexture(Texture);
 
-        // Update UI
-        if (ManagerWidget.IsValid())
-        {
-            ManagerWidget->RefreshPresetList();
-            ManagerWidget->RefreshTextureList();
+            // Update UI
+            if (ManagerWidget.IsValid())
+            {
+                ManagerWidget->RefreshTextureList();
+            }
+        }
+        UTexturePresetAsset* Preset = Cast< UTexturePresetAsset>(Obj);
+        if (Preset) {
+            // Update UI
+            if (ManagerWidget.IsValid())
+            {
+                ManagerWidget->RefreshPresetList();
+            }
         }
     }
 }

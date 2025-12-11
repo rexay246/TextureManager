@@ -1027,6 +1027,17 @@ void SMyTwoColumnWidget::OnPresetComboChanged(TSharedPtr<FString> NewSelection,E
 		NewPreset = PresetChoices[Index].Get();
 	}
 
+	TArray<FTextureItem> SelectedItems;
+
+	if (TextureListView.IsValid())
+	{
+		TextureListView->GetSelectedItems(SelectedItems);
+	}
+
+	if (SelectedItems.Num() <= 0) {
+		return;
+	}
+
 	UTexture2D* Texture = SelectedTexture.Get();
 	if (!Texture)
 	{
@@ -1071,8 +1082,14 @@ void SMyTwoColumnWidget::OnPresetComboChanged(TSharedPtr<FString> NewSelection,E
 
 	//Texture->Modify();
 	//TexturePresetLibrary::AssignPresetToTexture(NewPreset, Texture);
-	TexturePresetLibrary::ApplyToTexture(NewPreset, Texture);
-	Texture->PostEditChange();
+	for (auto tex : SelectedItems) {
+		if (tex.Get()) {
+			TexturePresetLibrary::ApplyToTexture(NewPreset, tex.Get());
+			tex->PostEditChange();
+		}
+	}
+	//TexturePresetLibrary::ApplyToTexture(NewPreset, Texture);
+	//Texture->PostEditChange();
 	//TexturePresetLibrary::ApplyToTexture(NewPreset, Texture);
 
 #endif
@@ -1160,6 +1177,7 @@ FReply SMyTwoColumnWidget::OnSaveButtonClicked()
 	// ----------------------------
 	if (!CurrentPreset)
 	{
+		Texture = SelectedTexture.Get();
 		const FString DefaultName = FString::Printf(TEXT("%s_Preset"), *Texture->GetName());
 
 		// Ask the user for the preset name (path is locked)
@@ -1193,18 +1211,16 @@ FReply SMyTwoColumnWidget::OnSaveButtonClicked()
 	// Changing Presets
 	// ----------------------------
 
-	TArray<UTexture2D*> LinkedTextures =
-		TexturePresetLibrary::GetAllTexturesUsingPreset(CurrentPreset);
+	TArray<UTexture2D*> LinkedTextures = CurrentPreset->Files;
+		//TexturePresetLibrary::GetAllTexturesUsingPreset(CurrentPreset);
 
 	if (bPendingPropertyChange) {
 		const FText Message = FText::Format(
 			NSLOCTEXT("TexturePreset", "OverwriteOrNew",
-				"The texture '{0}' is using preset '{1}'.\n"
-				"This preset is currently used by {2} texture(s).\n\n"
+				"This preset '{0}' is currently used by {1} texture(s).\n\n"
 				"Yes = Overwrite preset for all textures.\n"
 				"No = Create a new preset only for this texture.\n"
 				"Cancel = Do nothing."),
-			FText::FromString(Texture->GetName()),
 			FText::FromString(
 				CurrentPreset->PresetName.IsNone()
 				? CurrentPreset->GetName()
@@ -1600,8 +1616,8 @@ void SMyTwoColumnWidget::SaveFiles(TArray<FTextureItem> SelectedItems) {
 		{
 			UTexture2D* NewTexture = Item.Get();
 			NewTexture->Modify();
-			TexturePresetLibrary::AssignPresetToTexture(SelectedPreset.Get(), NewTexture);
 			TexturePresetLibrary::ApplyToTexture(SelectedPreset.Get(), NewTexture);
+			TexturePresetLibrary::AssignPresetToTexture(SelectedPreset.Get(), NewTexture);
 			NewTexture->PostEditChange();
 			//NewTexture->MarkPackageDirty();
 		}
@@ -1613,18 +1629,26 @@ void SMyTwoColumnWidget::OnDetailsPropertyChanged(const FPropertyChangedEvent& E
 	bPendingPropertyChange = true;
 	if (ActiveTab == ENavigationTab::Presets) {
 		auto Preset = PreviewPreset;
-		for (auto Texture : Preset->Files) {
-			TexturePresetLibrary::ApplyToTexture(Preset, Texture);
-			Texture->PostEditChange();
+		if (Preset) {
+			for (auto Texture : Preset->Files) {
+				if (Texture) {
+					TexturePresetLibrary::ApplyToTexture(Preset, Texture);
+					Texture->PostEditChange();
+				}
+			}
 		}
 	}
 	else {
 		auto PTexture = PreviewTexture;
 		UTexturePresetAsset* Copy = ClonePresetTransient(SelectedPreset.Get());;
 		TexturePresetLibrary::CaptureFromTexture(Copy, PTexture);
-		for (auto Texture : Copy->Files) {
-			TexturePresetLibrary::ApplyToTexture(Copy, Texture);
-			Texture->PostEditChange();
+		if (Copy) {
+			for (auto Texture : Copy->Files) {
+				if (Texture) {
+					TexturePresetLibrary::ApplyToTexture(Copy, Texture);
+					Texture->PostEditChange();
+				}
+			}
 		}
 	}
 }
