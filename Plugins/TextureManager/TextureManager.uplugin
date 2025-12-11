@@ -2,7 +2,7 @@
 	"FileVersion": 3,
 	"Version": 1,
 	"VersionName": "1.0",
-	"FriendlyName": "Texture Manager",
+	"FriendlyName": "Texture Preset Manager",
 	"Description": "A dedicated editor window for editing texture presets and applying them across multiple assets quickly. Also gives the ability to assign texture presets when importing textures",
 	"Category": "Tools",
 	"CreatedBy": "Hursh Nashine, Sky Wess, Raynard Christian",

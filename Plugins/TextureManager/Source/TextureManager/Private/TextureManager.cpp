@@ -43,7 +43,7 @@ void FTextureManagerModule::StartupModule()
     FGlobalTabmanager::Get()->RegisterNomadTabSpawner("TextureManager",
         FOnSpawnTab::CreateRaw(this, &FTextureManagerModule::OnSpawnPluginTab))
        .SetMenuType(ETabSpawnerMenuType::Hidden)
-       .SetDisplayName(FText::FromString("Texture Manager"));
+       .SetDisplayName(FText::FromString("Texture Preset Manager"));
 
     UToolMenus::RegisterStartupCallback(FSimpleMulticastDelegate::FDelegate::CreateRaw(this, &FTextureManagerModule::RegisterMenus));
 }
