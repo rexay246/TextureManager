@@ -24,6 +24,18 @@ DECLARE_CYCLE_STAT(TEXT("Texture Preset Manager|OnPresetSaveButtonClicked"),
 	STAT_TextureManager_OnPresetSaveButtonClicked,
 	STATGROUP_TPM);
 
+// Wall-clock ms spent inside OnSaveButtonClicked (persistent accumulator).
+DECLARE_FLOAT_ACCUMULATOR_STAT(
+	TEXT("Texture Preset Manager|OnSaveButtonClicked Wall Time (ms)"),
+	STAT_TextureManager_OnSaveButtonClickedWallMs,
+	STATGROUP_TPM);
+
+// Number of times OnSaveButtonClicked has run (persistent accumulator).
+DECLARE_DWORD_ACCUMULATOR_STAT(
+	TEXT("Texture Preset Manager|OnSaveButtonClicked Calls"),
+	STAT_TextureManager_OnSaveButtonClickedCalls,
+	STATGROUP_TPM);
+
 // Which "mode" the right side is in
 enum class ENavigationTab : uint8
 {

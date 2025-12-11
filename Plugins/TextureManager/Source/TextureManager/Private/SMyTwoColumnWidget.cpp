@@ -25,11 +25,14 @@
 #include "Framework/Application/SlateApplication.h"
 #include "Input/Reply.h"
 #include "InputCoreTypes.h"
-#include "Misc/MessageDialog.h"
 #include "UObject/UObjectGlobals.h" 
 #include "UObject/UnrealType.h"
 
+#include "Misc/MessageDialog.h"
+#include "Misc/DateTime.h"
+
 #include "Engine/Engine.h"
+#include "Stats/Stats.h"
 
 #include "Interfaces/IPluginManager.h"
 #include "FileHelpers.h" 
@@ -39,6 +42,44 @@
 #include "Containers/Ticker.h"
 
 #include "TextureManagerStats.h"
+
+// ---------- Structs ------------------------
+
+namespace
+{
+	struct FOnSaveButtonDurationScope
+	{
+		double StartSeconds;
+
+		FOnSaveButtonDurationScope()
+		{
+			StartSeconds = FPlatformTime::Seconds();
+		}
+
+		~FOnSaveButtonDurationScope()
+		{
+			const double EndSeconds = FPlatformTime::Seconds();
+			const float DurationMs = static_cast<float>((EndSeconds - StartSeconds) * 1000.0);
+
+			// Accumulate into stats
+			INC_FLOAT_STAT_BY(STAT_TextureManager_OnSaveButtonClickedWallMs, DurationMs);
+			INC_DWORD_STAT(STAT_TextureManager_OnSaveButtonClickedCalls);
+
+			// Optional: on-screen display so you don't need stats/Insights
+			if (GEngine)
+			{
+				GEngine->AddOnScreenDebugMessage(
+					-1,
+					5.0f,
+					FColor::Yellow,
+					FString::Printf(TEXT("OnSaveButtonClicked total wall time: %.2f ms"), DurationMs));
+			}
+
+			// Optional: log for text output
+			UE_LOG(LogTemp, Log, TEXT("OnSaveButtonClicked total wall time: %.2f ms"), DurationMs);
+		}
+	};
+}
 
 // ---------- Helper ------------------------
 
@@ -1131,10 +1172,14 @@ void SMyTwoColumnWidget::OnPresetComboChanged(TSharedPtr<FString> NewSelection,E
 }
 
 // ---------- Save button (and Ctrl+S) ----------
-
+//////////////////////////////////////////////////////////////////////////
 FReply SMyTwoColumnWidget::OnSaveButtonClicked()
 {
 	{
+		// Wall-clock timer for the entire function (including SaveDirtyTexturesAndPresets)
+		FOnSaveButtonDurationScope DurationScope;
+
+		// CPU cycle counter (kept if you still want it in your TPM group)
 		SCOPE_CYCLE_COUNTER(STAT_TextureManager_OnSaveButtonClicked);
 
 #if !WITH_EDITOR
