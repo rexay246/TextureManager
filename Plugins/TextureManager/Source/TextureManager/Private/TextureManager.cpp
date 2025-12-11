@@ -139,7 +139,7 @@ void FTextureManagerModule::RegisterMenus()
 
     Section.AddMenuEntry(
         "Texture Manager",
-        FText::FromString("Texture Manager"),
+        FText::FromString("Texture Preset Manager"),
         FText::FromString("Manage texture presets"),
         FSlateIcon(),
         FUIAction(FExecuteAction::CreateLambda([]()
