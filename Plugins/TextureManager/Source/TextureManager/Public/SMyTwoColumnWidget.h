@@ -25,7 +25,7 @@ DECLARE_CYCLE_STAT(TEXT("Texture Preset Manager|OnPresetSaveButtonClicked"),
 	STATGROUP_TPM);
 
 // Wall-clock ms spent inside OnSaveButtonClicked (persistent accumulator).
-DECLARE_FLOAT_ACCUMULATOR_STAT(
+DECLARE_FLOAT_COUNTER_STAT(
 	TEXT("Texture Preset Manager|OnSaveButtonClicked Wall Time (ms)"),
 	STAT_TextureManager_OnSaveButtonClickedWallMs,
 	STATGROUP_TPM);
@@ -34,6 +34,17 @@ DECLARE_FLOAT_ACCUMULATOR_STAT(
 DECLARE_DWORD_ACCUMULATOR_STAT(
 	TEXT("Texture Preset Manager|OnSaveButtonClicked Calls"),
 	STAT_TextureManager_OnSaveButtonClickedCalls,
+	STATGROUP_TPM);
+
+// Wall-clock accumulators for OnPresetSaveButtonClicked
+DECLARE_FLOAT_COUNTER_STAT(
+	TEXT("Texture Preset Manager|OnPresetSaveButtonClicked Wall Time (ms)"),
+	STAT_TextureManager_OnPresetSaveButtonClickedWallMs,
+	STATGROUP_TPM);
+
+DECLARE_DWORD_ACCUMULATOR_STAT(
+	TEXT("Texture Preset Manager|OnPresetSaveButtonClicked Calls"),
+	STAT_TextureManager_OnPresetSaveButtonClickedCalls,
 	STATGROUP_TPM);
 
 // Which "mode" the right side is in

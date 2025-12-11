@@ -38,6 +38,8 @@
 #include "FileHelpers.h" 
 
 #include "HAL/PlatformApplicationMisc.h"
+#include "HAL/PlatformTime.h"
+
 #include "Framework/Application/SlateApplication.h"
 #include "Containers/Ticker.h"
 
@@ -45,41 +47,72 @@
 
 // ---------- Structs ------------------------
 
-namespace
-{
-	struct FOnSaveButtonDurationScope
-	{
-		double StartSeconds;
-
-		FOnSaveButtonDurationScope()
-		{
-			StartSeconds = FPlatformTime::Seconds();
-		}
-
-		~FOnSaveButtonDurationScope()
-		{
-			const double EndSeconds = FPlatformTime::Seconds();
-			const float DurationMs = static_cast<float>((EndSeconds - StartSeconds) * 1000.0);
-
-			// Accumulate into stats
-			INC_FLOAT_STAT_BY(STAT_TextureManager_OnSaveButtonClickedWallMs, DurationMs);
-			INC_DWORD_STAT(STAT_TextureManager_OnSaveButtonClickedCalls);
-
-			// Optional: on-screen display so you don't need stats/Insights
-			if (GEngine)
-			{
-				GEngine->AddOnScreenDebugMessage(
-					-1,
-					5.0f,
-					FColor::Yellow,
-					FString::Printf(TEXT("OnSaveButtonClicked total wall time: %.2f ms"), DurationMs));
-			}
-
-			// Optional: log for text output
-			UE_LOG(LogTemp, Log, TEXT("OnSaveButtonClicked total wall time: %.2f ms"), DurationMs);
-		}
-	};
-}
+//namespace
+//{
+//	struct FOnSaveButtonDurationScope
+//	{
+//		const double StartSeconds;
+//
+//		FOnSaveButtonDurationScope()
+//			: StartSeconds(FPlatformTime::Seconds())
+//		{
+//		}
+//
+//		~FOnSaveButtonDurationScope()
+//		{
+//			const double EndSeconds = FPlatformTime::Seconds();
+//			const float DurationMs =
+//				static_cast<float>((EndSeconds - StartSeconds) * 1000.0);
+//
+//			// Accumulate for stats/graphs
+//			INC_FLOAT_STAT_BY(STAT_TextureManager_OnSaveButtonClickedWallMs, DurationMs);
+//			INC_DWORD_STAT(STAT_TextureManager_OnSaveButtonClickedCalls);
+//
+//			// Per-call display ONLY this call’s duration
+//			if (GEngine)
+//			{
+//				GEngine->AddOnScreenDebugMessage(
+//					-1,
+//					5.0f,
+//					FColor::Yellow,
+//					FString::Printf(TEXT("OnSaveButtonClicked wall time: %.2f ms"), DurationMs));
+//			}
+//
+//			UE_LOG(LogTemp, Log, TEXT("OnSaveButtonClicked wall time: %.2f ms"), DurationMs);
+//		}
+//	};
+//
+//	struct FOnPresetSaveButtonDurationScope
+//	{
+//		const double StartSeconds;
+//
+//		FOnPresetSaveButtonDurationScope()
+//			: StartSeconds(FPlatformTime::Seconds())
+//		{
+//		}
+//
+//		~FOnPresetSaveButtonDurationScope()
+//		{
+//			const double EndSeconds = FPlatformTime::Seconds();
+//			const float DurationMs =
+//				static_cast<float>((EndSeconds - StartSeconds) * 1000.0);
+//
+//			INC_FLOAT_STAT_BY(STAT_TextureManager_OnPresetSaveButtonClickedWallMs, DurationMs);
+//			INC_DWORD_STAT(STAT_TextureManager_OnPresetSaveButtonClickedCalls);
+//
+//			if (GEngine)
+//			{
+//				GEngine->AddOnScreenDebugMessage(
+//					-1,
+//					5.0f,
+//					FColor::Cyan,
+//					FString::Printf(TEXT("OnPresetSaveButtonClicked wall time: %.2f ms"), DurationMs));
+//			}
+//
+//			UE_LOG(LogTemp, Log, TEXT("OnPresetSaveButtonClicked wall time: %.2f ms"), DurationMs);
+//		}
+//	};
+//}
 
 // ---------- Helper ------------------------
 
@@ -1175,9 +1208,10 @@ void SMyTwoColumnWidget::OnPresetComboChanged(TSharedPtr<FString> NewSelection,E
 //////////////////////////////////////////////////////////////////////////
 FReply SMyTwoColumnWidget::OnSaveButtonClicked()
 {
+	// Start timing at the **very beginning** of the function
+	const double StartSeconds = FPlatformTime::Seconds();
+	
 	{
-		// Wall-clock timer for the entire function (including SaveDirtyTexturesAndPresets)
-		FOnSaveButtonDurationScope DurationScope;
 
 		// CPU cycle counter (kept if you still want it in your TPM group)
 		SCOPE_CYCLE_COUNTER(STAT_TextureManager_OnSaveButtonClicked);
@@ -1375,6 +1409,25 @@ FReply SMyTwoColumnWidget::OnSaveButtonClicked()
 		SelectPresetInCombo(SelectedPreset.Get());
 	}
 	SaveDirtyTexturesAndPresets();
+
+	const double EndSeconds = FPlatformTime::Seconds();
+	const float DurationMs = static_cast<float>((EndSeconds - StartSeconds) * 1000.0);
+
+	SET_FLOAT_STAT(STAT_TextureManager_OnSaveButtonClickedWallMs, DurationMs);
+	INC_DWORD_STAT(STAT_TextureManager_OnSaveButtonClickedCalls);
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(
+			-1,
+			5.0f,
+			FColor::Yellow,
+			FString::Printf(TEXT("OnSaveButtonClicked wall time: %.2f ms"), DurationMs));
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("OnSaveButtonClicked wall time: %.2f ms"), DurationMs);
+
+
 	return FReply::Handled();
 
 #endif
@@ -1382,6 +1435,7 @@ FReply SMyTwoColumnWidget::OnSaveButtonClicked()
 
 FReply SMyTwoColumnWidget::OnPresetSaveButtonClicked()
 {
+	const double StartSeconds = FPlatformTime::Seconds();
 	{
 		SCOPE_CYCLE_COUNTER(STAT_TextureManager_OnPresetSaveButtonClicked);
 
@@ -1421,6 +1475,25 @@ FReply SMyTwoColumnWidget::OnPresetSaveButtonClicked()
 		}
 	}
 	SaveDirtyTexturesAndPresets();
+	
+	const double EndSeconds = FPlatformTime::Seconds();
+	const float DurationMs = static_cast<float>((EndSeconds - StartSeconds) * 1000.0);
+
+	SET_FLOAT_STAT(STAT_TextureManager_OnPresetSaveButtonClickedWallMs, DurationMs);
+	INC_DWORD_STAT(STAT_TextureManager_OnPresetSaveButtonClickedCalls);
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(
+			-1,
+			5.0f,
+			FColor::Cyan,
+			FString::Printf(TEXT("OnPresetSaveButtonClicked wall time: %.2f ms"), DurationMs));
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("OnPresetSaveButtonClicked wall time: %.2f ms"), DurationMs);
+
+
 	return FReply::Handled();
 }
 
