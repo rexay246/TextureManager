@@ -398,6 +398,12 @@ ENavigationTab SMyTwoColumnWidget::GetActiveTab() const
 void SMyTwoColumnWidget::OnTabChanged(ENavigationTab NewTab)
 {
 	ActiveTab = NewTab;
+
+	CurrentFilterOption = AllPresetOption;
+	if (PresetFilterComboBox.IsValid())
+	{
+		PresetFilterComboBox->SetSelectedItem(CurrentFilterOption);
+	}
 	
 	if (ActiveTab == ENavigationTab::Files) {
 		if (SelectedPreset.Get()) {
@@ -434,6 +440,7 @@ void SMyTwoColumnWidget::OnTabChanged(ENavigationTab NewTab)
 	SelectedTexture = nullptr;
 	TextureListView->ClearSelection();
 	PresetListView->ClearSelection();
+
 	SyncSelectionToDetails();
 }
 
@@ -603,7 +610,10 @@ void SMyTwoColumnWidget::RefreshPresetList()
 	PresetLabels.Add(NonePresetOption);
 	PresetChoices.Add(nullptr);
 
+	AllPresetOption = MakeShared<FString>(TEXT("All"));
+	FilterPresetLabels.Add(AllPresetOption);
 	FilterPresetLabels.Add(NonePresetOption);
+	FilterPresetChoices.Add(nullptr);
 	FilterPresetChoices.Add(nullptr);
 
 #if WITH_EDITOR
@@ -682,6 +692,13 @@ void SMyTwoColumnWidget::RefreshPresetList()
 
 	// Re-select current preset in the combo box, if any
 	SelectPresetInCombo(SelectedPreset.Get());
+
+	CurrentFilterOption = AllPresetOption;
+
+	if (PresetFilterComboBox.IsValid())
+	{
+		PresetFilterComboBox->SetSelectedItem(CurrentFilterOption);
+	}
 }
 
 bool SMyTwoColumnWidget::PromptForPresetName(const FString& DefaultName, FString& OutName, const FString& FixedPath)
@@ -1511,8 +1528,13 @@ void SMyTwoColumnWidget::OnFilterComboChange(TSharedPtr<FString> NewSelection, E
 	CurrentFilterOption = NewSelection;
 	FilteredTextureItems.Empty();
 
+	TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(TEXT("TextureManager"));
+	if (!Plugin)
+		return;
+	const FString PluginRoot = Plugin->GetMountedAssetPath(); // e.g. "/Testing"
+
 	UTexturePresetAsset* FoundPreset =
-		TexturePresetLibrary::FindPresetByName(*CurrentFilterOption);
+		TexturePresetLibrary::FindPresetByName(*CurrentFilterOption, PluginRoot);
 
 
 	for (const FTextureItem& Item : AllTextureItems)
